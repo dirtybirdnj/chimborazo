@@ -1,6 +1,22 @@
 # Claude Agent Guidelines for Chimborazo
 
-Guidelines for Claude agents working in this repository.
+## ⚠️ NAMING CONVENTION - READ FIRST
+
+| What | Name | Usage |
+|------|------|-------|
+| **Project** | Chimborazo | Repo, imports, documentation |
+| **CLI Command** | `chimbo` | What users type |
+
+```bash
+# Correct:
+chimbo build recipe.yaml
+go install github.com/dirtybirdnj/chimborazo/cmd/chimbo@latest
+
+# Incorrect:
+chimborazo build recipe.yaml  # ❌ Use chimbo
+```
+
+---
 
 ## Project Context
 
