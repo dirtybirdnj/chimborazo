@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1152.00" height="1728.00"
+     viewBox="0 0 1152.00 1728.00">
+  <rect width="1152.00" height="1728.00" fill="white"/>
+  <g id="border">
+    <path d="M153.60 1508.16 L576.00 1508.16 L1104.00 1508.16 L1104.00 309.60 L840.00 309.60 L153.60 309.60 L153.60 837.60 L153.60 1508.16 Z" stroke="#333333" stroke-width="2.00" fill="#f5f5dc" opacity="1.00" fill-rule="evenodd"/>
+  </g>
+  <g id="lake">
+    <path d="M100.80 837.60 L153.60 573.60 L206.40 309.60 L153.60 309.60 L100.80 415.20 L74.40 679.20 L100.80 837.60 Z" stroke="#1976d2" stroke-width="1.50" fill="#bbdefb" opacity="1.00" fill-rule="evenodd"/>
+  </g>
+  <g id="towns">
+    <circle cx="201.12" cy="584.16" r="6.0" stroke="#c62828" stroke-width="3.00" fill="#c62828" opacity="1.00"/>
+    <circle cx="533.76" cy="700.32" r="6.0" stroke="#c62828" stroke-width="3.00" fill="#c62828" opacity="1.00"/>
+    <circle cx="475.68" cy="594.72" r="6.0" stroke="#c62828" stroke-width="3.00" fill="#c62828" opacity="1.00"/>
+    <circle cx="407.04" cy="1038.24" r="6.0" stroke="#c62828" stroke-width="3.00" fill="#c62828" opacity="1.00"/>
+  </g>
+</svg>
