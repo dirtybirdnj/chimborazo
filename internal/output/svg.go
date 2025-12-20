@@ -3,6 +3,7 @@ package output
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/paulmach/orb"
@@ -257,8 +258,6 @@ func (w *SVGWriter) Render(layers []Layer) string {
 
 // RenderToFile writes the SVG to a file.
 func (w *SVGWriter) RenderToFile(layers []Layer, path string) error {
-	// Import os when implementing
-	// content := w.Render(layers)
-	// return os.WriteFile(path, []byte(content), 0644)
-	return nil // TODO: implement
+	content := w.Render(layers)
+	return os.WriteFile(path, []byte(content), 0644)
 }

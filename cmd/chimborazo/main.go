@@ -5,6 +5,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/dirtybirdnj/chimborazo/internal/config"
+	"github.com/dirtybirdnj/chimborazo/internal/sources"
+	"github.com/dirtybirdnj/chimborazo/pkg/pipeline"
 )
 
 var version = "0.1.0-dev"
@@ -38,7 +42,25 @@ func buildCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("Building from %s...\n", args[0])
-			fmt.Println("Not implemented yet")
+
+			recipe, err := config.LoadRecipe(args[0])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading recipe: %v\n", err)
+				os.Exit(1)
+			}
+
+			fetcher, _ := sources.NewFetcher("~/.chimborazo/cache")
+			builder := pipeline.NewBuilder(recipe, fetcher)
+			builder.Verbose = true
+
+			result, err := builder.Build()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Build failed: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("✓ Built %s (%d layers, %d features) in %v\n",
+				result.OutputPath, result.LayerCount, result.FeatureCount, result.Duration)
 		},
 	}
 }
@@ -49,8 +71,18 @@ func validateCmd() *cobra.Command {
 		Short: "Validate a recipe without building",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Validating %s...\n", args[0])
-			fmt.Println("Not implemented yet")
+			recipe, err := config.LoadRecipe(args[0])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
+				os.Exit(1)
+			}
+
+			if err := config.ValidateRecipe(recipe); err != nil {
+				fmt.Fprintf(os.Stderr, "Validation error: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("✓ Recipe valid: %s (%d layers)\n", recipe.Name, len(recipe.Layers))
 		},
 	}
 }

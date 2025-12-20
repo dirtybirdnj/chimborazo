@@ -1,0 +1,16 @@
+name: Vermont Test
+output:
+  path: output/test_vt.svg
+  width: 12
+  height: 18
+  units: inches
+bounds:
+  source: "file:../../strata/output/vermont_12x18/geojson/vt_towns.geojson"
+  padding: 0.1
+layers:
+  - name: vt_towns
+    source: "file:/Users/mgilbert/Code/strata/output/vermont_12x18/geojson/vt_towns.geojson"
+    style:
+      stroke: "#333333"
+      fill: "#f5f5dc"
+      stroke_width: "0.5"

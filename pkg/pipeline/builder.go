@@ -4,10 +4,13 @@ package pipeline
 
 import (
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geojson"
 
 	"github.com/dirtybirdnj/chimborazo/internal/config"
 	"github.com/dirtybirdnj/chimborazo/internal/geometry"
@@ -85,11 +88,10 @@ func (b *Builder) Build() (*BuildResult, error) {
 		bounds,
 	)
 
-	svgContent := writer.Render(layers)
-
 	// Step 5: Write to file
-	// TODO: Actually write to file
-	_ = svgContent
+	if err := writer.RenderToFile(layers, b.Recipe.Output.Path); err != nil {
+		return nil, fmt.Errorf("writing output: %w", err)
+	}
 	result.OutputPath = b.Recipe.Output.Path
 
 	result.Duration = time.Since(start)
@@ -142,22 +144,46 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 
 // fetchSource retrieves data from a source URI.
 func (b *Builder) fetchSource(uri string) (geometry.FeatureCollection, error) {
-	// TODO: Implement source resolution
-	// For now, return empty collection
-	//
-	// The source URI format is: scheme:path
-	// Examples:
-	//   census:tiger/2023/vt/cousub
-	//   file:./data/towns.geojson
-	//   url:https://example.com/data.json
-	//
-	// Each scheme needs a resolver that:
-	// 1. Constructs the actual URL
-	// 2. Uses the Fetcher to download/cache
-	// 3. Parses the response (GeoJSON, Shapefile, etc.)
-	// 4. Returns a FeatureCollection
+	// Parse scheme:path
+	parts := strings.SplitN(uri, ":", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid source URI (expected scheme:path): %s", uri)
+	}
+	scheme, path := parts[0], parts[1]
 
-	return nil, fmt.Errorf("source fetching not yet implemented: %s", uri)
+	switch scheme {
+	case "file":
+		return b.loadGeoJSONFile(path)
+	case "url":
+		// Fetch remote URL and cache locally
+		result, err := b.Fetcher.Fetch(path)
+		if err != nil {
+			return nil, fmt.Errorf("fetching URL: %w", err)
+		}
+		return b.loadGeoJSONFile(result.Path)
+	default:
+		return nil, fmt.Errorf("unsupported source scheme: %s", scheme)
+	}
+}
+
+// loadGeoJSONFile reads a local GeoJSON file and returns features.
+func (b *Builder) loadGeoJSONFile(path string) (geometry.FeatureCollection, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading file: %w", err)
+	}
+
+	fc, err := geojson.UnmarshalFeatureCollection(data)
+	if err != nil {
+		return nil, fmt.Errorf("parsing GeoJSON: %w", err)
+	}
+
+	// Convert to our FeatureCollection type
+	result := make(geometry.FeatureCollection, len(fc.Features))
+	for i, f := range fc.Features {
+		result[i] = geometry.FromGeoJSON(f)
+	}
+	return result, nil
 }
 
 // applyOperation executes a geometry operation on features.
