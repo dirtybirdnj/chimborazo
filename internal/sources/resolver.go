@@ -410,12 +410,17 @@ func (r *Resolver) resolveQuebec(uri string) (geometry.FeatureCollection, error)
 	cacheKey := parsed.CacheKey()
 	sourceDir := filepath.Join(r.CacheDir, cacheKey)
 
-	// Check if we already have the shapefile
-	pattern := parsed.ShapefilePrefix + "*.shp"
-	matches, _ := filepath.Glob(filepath.Join(sourceDir, "**", pattern))
-	if len(matches) == 0 {
-		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
-	}
+	// Check if we already have the shapefile - walk directory tree
+	var matches []string
+	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".shp") && strings.Contains(filepath.Base(path), parsed.ShapefilePrefix) {
+			matches = append(matches, path)
+		}
+		return nil
+	})
 	if len(matches) > 0 {
 		r.logf("Using cached: %s", uri)
 		return ReadShapefile(matches[0])
@@ -439,11 +444,17 @@ func (r *Resolver) resolveQuebec(uri string) (geometry.FeatureCollection, error)
 		return nil, fmt.Errorf("extracting zip: %w", err)
 	}
 
-	// Find the shapefile matching our layer
-	matches, _ = filepath.Glob(filepath.Join(sourceDir, "**", pattern))
-	if len(matches) == 0 {
-		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
-	}
+	// Find the shapefile matching our layer (walk directory tree)
+	matches = nil // reset from earlier check
+	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".shp") && strings.Contains(filepath.Base(path), parsed.ShapefilePrefix) {
+			matches = append(matches, path)
+		}
+		return nil
+	})
 	if len(matches) == 0 {
 		// Fall back to any shapefile
 		shpPath, err := FindShapefile(sourceDir)
@@ -453,6 +464,7 @@ func (r *Resolver) resolveQuebec(uri string) (geometry.FeatureCollection, error)
 		return ReadShapefile(shpPath)
 	}
 
+	r.logf("Found shapefile: %s", matches[0])
 	return ReadShapefile(matches[0])
 }
 
@@ -467,12 +479,21 @@ func (r *Resolver) resolveCanada(uri string) (geometry.FeatureCollection, error)
 	cacheKey := parsed.CacheKey()
 	sourceDir := filepath.Join(r.CacheDir, cacheKey)
 
-	// Check if we already have the shapefile
+	// Check if we already have the shapefile - walk directory tree
 	pattern := parsed.ShapefilePattern()
-	matches, _ := filepath.Glob(filepath.Join(sourceDir, "**", pattern))
-	if len(matches) == 0 {
-		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
-	}
+	var matches []string
+	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			matched, _ := filepath.Match(pattern, filepath.Base(path))
+			if matched {
+				matches = append(matches, path)
+			}
+		}
+		return nil
+	})
 	if len(matches) > 0 {
 		r.logf("Using cached: %s", uri)
 		return ReadShapefile(matches[0])
@@ -496,11 +517,20 @@ func (r *Resolver) resolveCanada(uri string) (geometry.FeatureCollection, error)
 		return nil, fmt.Errorf("extracting zip: %w", err)
 	}
 
-	// Find the shapefile matching our pattern
-	matches, _ = filepath.Glob(filepath.Join(sourceDir, "**", pattern))
-	if len(matches) == 0 {
-		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
-	}
+	// Find the shapefile matching our pattern (walk directory tree)
+	matches = nil // reset from earlier check
+	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			matched, _ := filepath.Match(pattern, filepath.Base(path))
+			if matched {
+				matches = append(matches, path)
+			}
+		}
+		return nil
+	})
 	if len(matches) == 0 {
 		// Fall back to any shapefile
 		shpPath, err := FindShapefile(sourceDir)
@@ -510,5 +540,6 @@ func (r *Resolver) resolveCanada(uri string) (geometry.FeatureCollection, error)
 		return ReadShapefile(shpPath)
 	}
 
+	r.logf("Found shapefile: %s", matches[0])
 	return ReadShapefile(matches[0])
 }
