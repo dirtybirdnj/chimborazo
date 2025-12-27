@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
@@ -49,6 +50,10 @@ func (r *Resolver) Resolve(uri string) (geometry.FeatureCollection, error) {
 	switch scheme {
 	case "census":
 		return r.resolveCensus(uri)
+	case "quebec":
+		return r.resolveQuebec(uri)
+	case "canada":
+		return r.resolveCanada(uri)
 	case "file":
 		return r.resolveFile(uri)
 	case "http", "https":
@@ -62,6 +67,12 @@ func (r *Resolver) Resolve(uri string) (geometry.FeatureCollection, error) {
 func (r *Resolver) getScheme(uri string) string {
 	if strings.HasPrefix(uri, "census://") || strings.HasPrefix(uri, "census:") {
 		return "census"
+	}
+	if strings.HasPrefix(uri, "quebec://") || strings.HasPrefix(uri, "quebec:") {
+		return "quebec"
+	}
+	if strings.HasPrefix(uri, "canada://") || strings.HasPrefix(uri, "canada:") {
+		return "canada"
 	}
 	if strings.HasPrefix(uri, "file://") || strings.HasPrefix(uri, "file:") {
 		return "file"
@@ -386,4 +397,118 @@ func (r *Resolver) logf(format string, args ...interface{}) {
 	if r.Verbose {
 		fmt.Printf(format+"\n", args...)
 	}
+}
+
+// resolveQuebec handles quebec:// URIs for Quebec administrative boundaries.
+func (r *Resolver) resolveQuebec(uri string) (geometry.FeatureCollection, error) {
+	parsed, err := ParseQuebecURI(uri)
+	if err != nil {
+		return nil, fmt.Errorf("parsing quebec URI: %w", err)
+	}
+
+	// Create cache directory for this source
+	cacheKey := parsed.CacheKey()
+	sourceDir := filepath.Join(r.CacheDir, cacheKey)
+
+	// Check if we already have the shapefile
+	pattern := parsed.ShapefilePrefix + "*.shp"
+	matches, _ := filepath.Glob(filepath.Join(sourceDir, "**", pattern))
+	if len(matches) == 0 {
+		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
+	}
+	if len(matches) > 0 {
+		r.logf("Using cached: %s", uri)
+		return ReadShapefile(matches[0])
+	}
+
+	// Need to download
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		return nil, fmt.Errorf("creating source directory: %w", err)
+	}
+
+	r.logf("Downloading: %s", parsed.URL)
+
+	// Quebec files can be large (47-88 MB), use 5 minute timeout
+	result, err := r.Fetcher.Fetch(parsed.URL, WithTimeout(5*time.Minute))
+	if err != nil {
+		return nil, fmt.Errorf("downloading %s: %w", parsed.URL, err)
+	}
+
+	// Extract ZIP
+	if err := ExtractZip(result.Path, sourceDir); err != nil {
+		return nil, fmt.Errorf("extracting zip: %w", err)
+	}
+
+	// Find the shapefile matching our layer
+	matches, _ = filepath.Glob(filepath.Join(sourceDir, "**", pattern))
+	if len(matches) == 0 {
+		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
+	}
+	if len(matches) == 0 {
+		// Fall back to any shapefile
+		shpPath, err := FindShapefile(sourceDir)
+		if err != nil {
+			return nil, err
+		}
+		return ReadShapefile(shpPath)
+	}
+
+	return ReadShapefile(matches[0])
+}
+
+// resolveCanada handles canada:// URIs for Canadian data (CanVec, NHN).
+func (r *Resolver) resolveCanada(uri string) (geometry.FeatureCollection, error) {
+	parsed, err := ParseCanadaURI(uri)
+	if err != nil {
+		return nil, fmt.Errorf("parsing canada URI: %w", err)
+	}
+
+	// Create cache directory for this source
+	cacheKey := parsed.CacheKey()
+	sourceDir := filepath.Join(r.CacheDir, cacheKey)
+
+	// Check if we already have the shapefile
+	pattern := parsed.ShapefilePattern()
+	matches, _ := filepath.Glob(filepath.Join(sourceDir, "**", pattern))
+	if len(matches) == 0 {
+		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
+	}
+	if len(matches) > 0 {
+		r.logf("Using cached: %s", uri)
+		return ReadShapefile(matches[0])
+	}
+
+	// Need to download
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		return nil, fmt.Errorf("creating source directory: %w", err)
+	}
+
+	r.logf("Downloading: %s", parsed.URL)
+
+	// Canadian files can be large (up to 150 MB for CanVec), use 5 minute timeout
+	result, err := r.Fetcher.Fetch(parsed.URL, WithTimeout(5*time.Minute))
+	if err != nil {
+		return nil, fmt.Errorf("downloading %s: %w", parsed.URL, err)
+	}
+
+	// Extract ZIP
+	if err := ExtractZip(result.Path, sourceDir); err != nil {
+		return nil, fmt.Errorf("extracting zip: %w", err)
+	}
+
+	// Find the shapefile matching our pattern
+	matches, _ = filepath.Glob(filepath.Join(sourceDir, "**", pattern))
+	if len(matches) == 0 {
+		matches, _ = filepath.Glob(filepath.Join(sourceDir, pattern))
+	}
+	if len(matches) == 0 {
+		// Fall back to any shapefile
+		shpPath, err := FindShapefile(sourceDir)
+		if err != nil {
+			return nil, err
+		}
+		return ReadShapefile(shpPath)
+	}
+
+	return ReadShapefile(matches[0])
 }

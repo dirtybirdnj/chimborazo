@@ -1,0 +1,235 @@
+# Lake Champlain Region - Multi-State/Province Map
+# Includes: Vermont, New York, New Hampshire, Massachusetts, Quebec
+#
+# Run with: chimborazo build examples/lake-champlain-region.yaml
+
+name: Lake Champlain Region with Quebec
+
+output:
+  path: output/lake-champlain-region.svg
+  width: 18
+  height: 24
+  units: inches
+  quality: high
+  min_feature_size: 3
+  rulers: true
+
+bounds:
+  # Full Lake Champlain / Richelieu Corridor region
+  # Extends north to show Quebec municipalities and eventually St. Lawrence
+  # [West, South, East, North]
+  explicit: [-74.5, 42.0, -70.5, 46.0]
+  padding: 0.02
+
+layers:
+  # Water layer (rendered first, at bottom)
+  - name: water_vt
+    source: census://areawater/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "10"
+
+  - name: water_ny
+    source: census://areawater/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "10"
+
+  - name: water_nh
+    source: census://areawater/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "10"
+
+  - name: water_ma
+    source: census://areawater/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "10"
+
+  # Towns/cousubs for each state - colored by state
+  - name: towns_vt
+    source: census://cousub/VT
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E8F5E9"  # Light green for VT
+      order: "50"
+
+  - name: towns_ny
+    source: census://cousub/NY
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NY
+          by_county: true
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#FFF3E0"  # Light orange for NY
+      order: "50"
+
+  - name: towns_nh
+    source: census://cousub/NH
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NH
+          by_county: true
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E3F2FD"  # Light blue for NH
+      order: "50"
+
+  - name: towns_ma
+    source: census://cousub/MA
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/MA
+          by_county: true
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#FCE4EC"  # Light pink for MA
+      order: "50"
+
+  # County boundaries for each state
+  - name: counties_vt
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ny
+    source: census://county/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  - name: counties_nh
+    source: census://county/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ma
+    source: census://county/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  # Quebec municipalities (Canadian data)
+  - name: quebec_muni
+    source: quebec://municipalities
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E8EAF6"  # Light indigo for Quebec
+      order: "50"
+
+  # Quebec MRC (Regional County Municipality) boundaries
+  - name: quebec_mrc
+    source: quebec://mrc
+    operations:
+      - type: clip
+    style:
+      stroke: "#5C6BC0"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "75"
+
+  # Canadian hydro (CanVec national coverage)
+  - name: canada_hydro
+    source: canada://canvec/hydro
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "10"
+
+  # State/Province boundaries (rendered on top)
+  - name: state_vt
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ny
+    source: census://state/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_nh
+    source: census://state/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ma
+    source: census://state/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
