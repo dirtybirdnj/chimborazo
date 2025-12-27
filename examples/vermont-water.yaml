@@ -1,0 +1,49 @@
+# Vermont State Map with Water Cut Out
+# Tests the subtract operation to remove water bodies from land
+#
+# Run with: chimborazo build examples/vermont-water.yaml
+
+name: Vermont with Water Subtracted
+
+# Output configuration
+output:
+  path: output/vermont-water.svg
+  width: 12
+  height: 18
+  units: inches
+
+# Map bounds derived from state geometry
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+# Map layers (rendered in order, first = bottom)
+layers:
+  # State boundary with water cut out
+  - name: state_land
+    source: census://state/VT
+    operations:
+      - type: subtract
+        params:
+          # Use local cache from strata to avoid slow downloads
+          source: file://~/Library/Caches/strata/census/tiger/2023/vt/areawater/merged.shp
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "#f5f5f5"
+      order: "100"
+
+  # County boundaries
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+      - type: simplify
+        params:
+          tolerance: 0.0001
+    style:
+      stroke: "#999999"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "50"

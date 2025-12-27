@@ -1,0 +1,59 @@
+# Vermont Dissolve Test
+# Dissolves town boundaries (cousub) by county FIPS to produce county outlines
+#
+# Run with: chimborazo build examples/vermont-dissolve.yaml
+
+name: Vermont Dissolved by County
+
+output:
+  path: output/vermont-dissolve.svg
+  width: 12
+  height: 18
+  units: inches
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+layers:
+  # State boundary
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "100"
+
+  # Towns dissolved to counties
+  - name: dissolved_counties
+    source: file://~/Library/Caches/strata/census/tiger/2023/vt/cousub/tl_2023_50_cousub.shp
+    operations:
+      - type: dissolve
+        params:
+          field: COUNTYFP
+      - type: clip
+      - type: simplify
+        params:
+          tolerance: 0.0001
+    style:
+      stroke: "#2196F3"
+      stroke_width: "1.5"
+      fill: "none"
+      order: "75"
+
+  # Actual county boundaries for comparison (thinner, red)
+  - name: actual_counties
+    source: census://county/VT
+    operations:
+      - type: clip
+      - type: simplify
+        params:
+          tolerance: 0.0001
+    style:
+      stroke: "#F44336"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "50"

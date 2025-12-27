@@ -3,6 +3,7 @@ package output
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -34,6 +35,9 @@ type Layer struct {
 	Features geometry.FeatureCollection
 	Style    Style
 	Order    int
+	FillBy   string            // Property name to color by
+	ColorMap map[string]string // Property value → fill color
+	VaryFill bool              // Apply slight color variations
 }
 
 // DefaultStyle returns a reasonable default style.
@@ -67,6 +71,7 @@ func (w *SVGWriter) viewportSize() (float64, float64) {
 
 // projectPoint transforms a geographic point to SVG coordinates.
 // Y is flipped because SVG origin is top-left, but geo origin is bottom-left.
+// Applies latitude correction so maps don't appear horizontally stretched.
 func (w *SVGWriter) projectPoint(p orb.Point) (float64, float64) {
 	marginPx := w.Margin * w.DPI
 	vpWidth, vpHeight := w.viewportSize()
@@ -75,8 +80,14 @@ func (w *SVGWriter) projectPoint(p orb.Point) (float64, float64) {
 	geoWidth := w.Bounds.Max[0] - w.Bounds.Min[0]
 	geoHeight := w.Bounds.Max[1] - w.Bounds.Min[1]
 
+	// Apply latitude correction - at higher latitudes, degrees of longitude
+	// cover less ground distance than degrees of latitude
+	centerLat := (w.Bounds.Min[1] + w.Bounds.Max[1]) / 2
+	latCorrection := math.Cos(centerLat * math.Pi / 180)
+	effectiveWidth := geoWidth * latCorrection
+
 	// Scale to fit (maintain aspect ratio)
-	scaleX := vpWidth / geoWidth
+	scaleX := vpWidth / effectiveWidth
 	scaleY := vpHeight / geoHeight
 	scale := scaleX
 	if scaleY < scaleX {
@@ -84,11 +95,11 @@ func (w *SVGWriter) projectPoint(p orb.Point) (float64, float64) {
 	}
 
 	// Center the map
-	offsetX := (vpWidth - geoWidth*scale) / 2
+	offsetX := (vpWidth - effectiveWidth*scale) / 2
 	offsetY := (vpHeight - geoHeight*scale) / 2
 
-	// Transform point
-	x := marginPx + offsetX + (p[0]-w.Bounds.Min[0])*scale
+	// Transform point - apply same latitude correction to x coordinate
+	x := marginPx + offsetX + (p[0]-w.Bounds.Min[0])*latCorrection*scale
 	y := marginPx + offsetY + (w.Bounds.Max[1]-p[1])*scale // flip Y
 
 	return x, y
@@ -225,6 +236,65 @@ func (w *SVGWriter) WriteCollection(fc geometry.FeatureCollection, style Style) 
 	return sb.String()
 }
 
+// WriteCollectionWithColors converts a FeatureCollection with per-feature coloring.
+func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, style Style, fillBy string, colorMap map[string]string, varyFill bool) string {
+	var sb strings.Builder
+	for i, f := range fc {
+		// Determine fill color for this feature
+		featureStyle := style
+		if fillBy != "" && colorMap != nil {
+			if propVal, ok := f.Properties[fillBy]; ok {
+				key := fmt.Sprintf("%v", propVal)
+				if color, exists := colorMap[key]; exists {
+					featureStyle.Fill = color
+					if varyFill {
+						// Apply slight variation based on feature index
+						featureStyle.Fill = varyColor(color, i)
+					}
+				}
+			}
+		}
+
+		element := w.WriteFeature(f, featureStyle)
+		if element != "" {
+			sb.WriteString("    ")
+			sb.WriteString(element)
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
+}
+
+// varyColor applies a slight variation to a hex color.
+func varyColor(hexColor string, seed int) string {
+	// Parse hex color
+	if len(hexColor) != 7 || hexColor[0] != '#' {
+		return hexColor
+	}
+
+	var r, g, b int
+	fmt.Sscanf(hexColor, "#%02x%02x%02x", &r, &g, &b)
+
+	// Apply small variation (±5%)
+	variation := (seed % 11) - 5 // -5 to +5
+	r = clamp(r + variation*2, 0, 255)
+	g = clamp(g + variation*2, 0, 255)
+	b = clamp(b + variation*2, 0, 255)
+
+	return fmt.Sprintf("#%02x%02x%02x", r, g, b)
+}
+
+// clamp restricts a value to a range.
+func clamp(val, min, max int) int {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
+}
+
 // Render generates a complete SVG document from layers.
 func (w *SVGWriter) Render(layers []Layer) string {
 	widthPx := w.Width * w.DPI
@@ -247,7 +317,12 @@ func (w *SVGWriter) Render(layers []Layer) string {
 	for _, layer := range layers {
 		sb.WriteString(fmt.Sprintf(`  <g id="%s">
 `, layer.Name))
-		sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
+		// Use color mapping if fill_by is specified
+		if layer.FillBy != "" && layer.ColorMap != nil {
+			sb.WriteString(w.WriteCollectionWithColors(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill))
+		} else {
+			sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
+		}
 		sb.WriteString("  </g>\n")
 	}
 
@@ -259,5 +334,44 @@ func (w *SVGWriter) Render(layers []Layer) string {
 // RenderToFile writes the SVG to a file.
 func (w *SVGWriter) RenderToFile(layers []Layer, path string) error {
 	content := w.Render(layers)
+	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// RenderSingleLayer generates an SVG document with just one layer (no background).
+// Useful for per-layer output for pen plotters.
+func (w *SVGWriter) RenderSingleLayer(layer Layer) string {
+	widthPx := w.Width * w.DPI
+	heightPx := w.Height * w.DPI
+
+	var sb strings.Builder
+
+	// SVG header
+	sb.WriteString(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="%.2f" height="%.2f"
+     viewBox="0 0 %.2f %.2f">
+`, widthPx, heightPx, widthPx, heightPx))
+
+	// No background for individual layers - cleaner for plotting
+
+	// Render the single layer
+	sb.WriteString(fmt.Sprintf(`  <g id="%s">
+`, layer.Name))
+	// Use color mapping if fill_by is specified
+	if layer.FillBy != "" && layer.ColorMap != nil {
+		sb.WriteString(w.WriteCollectionWithColors(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill))
+	} else {
+		sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
+	}
+	sb.WriteString("  </g>\n")
+
+	sb.WriteString("</svg>\n")
+
+	return sb.String()
+}
+
+// RenderLayerToFile writes a single layer SVG to a file.
+func (w *SVGWriter) RenderLayerToFile(layer Layer, path string) error {
+	content := w.RenderSingleLayer(layer)
 	return os.WriteFile(path, []byte(content), 0644)
 }

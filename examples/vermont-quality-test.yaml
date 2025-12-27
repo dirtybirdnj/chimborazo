@@ -1,0 +1,40 @@
+# Vermont Quality Test
+# Change the quality setting to compare output sizes
+#
+# Run with: chimborazo build examples/vermont-quality-test.yaml
+#
+# Quality options: low, medium, high, plotter
+
+name: Vermont Quality Test
+
+output:
+  path: output/vermont-quality.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high   # Try: low, medium, high, plotter
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+layers:
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "100"
+
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "1.0"
+      fill: "none"
+      order: "50"

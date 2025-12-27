@@ -1,0 +1,57 @@
+# Vermont Filter Test
+# Filters counties by name to show only Chittenden County
+#
+# Run with: chimborazo build examples/vermont-filter.yaml
+
+name: Vermont Filtered Counties
+
+output:
+  path: output/vermont-filter.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+layers:
+  # State boundary
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "100"
+
+  # All counties (light gray)
+  - name: all_counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#CCCCCC"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "40"
+
+  # Filtered: Only Chittenden County (highlighted)
+  - name: chittenden
+    source: census://county/VT
+    operations:
+      - type: filter
+        params:
+          field: NAME
+          operator: "="
+          value: Chittenden
+      - type: clip
+    style:
+      stroke: "#2196F3"
+      stroke_width: "2.0"
+      fill: "#E3F2FD"
+      opacity: "0.5"
+      order: "60"

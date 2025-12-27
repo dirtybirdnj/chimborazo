@@ -4,9 +4,38 @@ Guidelines for Claude agents working in this repository.
 
 ## Project Context
 
-Chimborazo is a Go port of the Strata Python geospatial toolkit. It transforms YAML recipes into SVG maps.
+Chimborazo is a Go port of the Strata Python geospatial toolkit. It transforms YAML recipes into SVG maps optimized for pen plotters and laser cutters.
 
 **Key constraint**: This project uses a hybrid workflow where local LLMs (via clood) do implementation and Claude provides architecture, specs, and review.
+
+## Narrative Branding
+
+This project uses a historical narrative voice. Documentation is written from the perspective of **Alexander von Humboldt** in Paris (1805-1834), reflecting on his expedition to the Americas and drawing connections to cartographic principles.
+
+### The Expedition Metaphor
+
+| Stage | Package | Expedition Phase | Historical Reference |
+|-------|---------|------------------|---------------------|
+| Preparation | `internal/config` | Madrid: instruments & permissions | Maury's coordination |
+| Acquisition | `internal/sources` | Collecting specimens | Thoreau's "go to the source" |
+| Transformation | `internal/geometry` | Comparing & combining | Humboldt's unity in diversity |
+| Revelation | `internal/output` | The Naturgemälde diagram | Kelley's maps-as-evidence |
+| Return | `pkg/pipeline` | 30 volumes in Paris | Full orchestration |
+
+### Voice Guidelines
+
+When writing documentation:
+- Use retrospective, reflective tone (Humboldt looking back on the journey)
+- Reference historical figures as intellectual companions, not package names
+- Connect technical concepts to expedition metaphors
+- See `BRANDING.md` for full voice guidelines and example prose
+
+### Key Documents
+
+- `README.md` - Narrative introduction and quick start
+- `BRANDING.md` - Voice guidelines and historical ensemble
+- `EXPEDITION.md` - Full narrative journey through architecture
+- Package `doc.go` files - Narrative + technical documentation
 
 ## Architecture Overview
 
@@ -14,13 +43,13 @@ Chimborazo is a Go port of the Strata Python geospatial toolkit. It transforms Y
 Recipe (YAML) → Parser → Pipeline → Sources → Geometry Ops → SVG Output
 ```
 
-| Module | Go Package | Python Equivalent | Purpose |
-|--------|------------|-------------------|---------|
-| Config | `internal/config` | `maury` | Recipe parsing |
-| Sources | `internal/sources` | `thoreau` | Data fetching/caching |
-| Geometry | `internal/geometry` | `humboldt` | Geo operations |
-| Output | `internal/output` | `kelley` | SVG generation |
-| Pipeline | `pkg/pipeline` | `maury.pipeline` | Orchestration |
+| Stage | Go Package | Purpose |
+|-------|------------|---------|
+| Preparation | `internal/config` | Recipe parsing & validation |
+| Acquisition | `internal/sources` | Data fetching & caching |
+| Transformation | `internal/geometry` | Geometric operations |
+| Revelation | `internal/output` | SVG generation |
+| Return | `pkg/pipeline` | Build orchestration |
 
 ## Dependencies
 
@@ -28,6 +57,8 @@ Recipe (YAML) → Parser → Pipeline → Sources → Geometry Ops → SVG Outpu
 |---------|---------|
 | `github.com/paulmach/orb` | Geometry primitives |
 | `github.com/paulmach/orb/geojson` | GeoJSON parsing |
+| `github.com/paulmach/orb/clip` | Clipping operations |
+| `github.com/paulmach/orb/simplify` | Douglas-Peucker simplification |
 | `github.com/ajstarks/svgo` | SVG generation |
 | `github.com/spf13/cobra` | CLI framework |
 | `gopkg.in/yaml.v3` | YAML parsing |
@@ -59,6 +90,30 @@ func WithTimeout(d time.Duration) FetcherOption {
 
 ## For Claude Agents
 
+### When Writing Documentation
+
+1. Open with a Humboldt-voice paragraph connecting to the expedition
+2. Transition to technical documentation
+3. Reference historical figures as wisdom sources, not namesakes
+4. Use the stage names (Preparation, Acquisition, etc.) not module names
+
+Example doc.go structure:
+```go
+/*
+Package sources provides data acquisition from authoritative sources.
+
+# The Acquisition Stage
+
+I learned in Cumaná what the surveyor Thoreau knew: one must go to the source.
+[narrative paragraph]
+
+# Supported URI Schemes
+
+[technical documentation]
+*/
+package sources
+```
+
 ### When Reviewing Local LLM Code
 
 1. Check error handling is complete
@@ -83,6 +138,18 @@ Prefer to write a detailed spec and let the local LLM implement. Only implement 
 - The local LLM has failed multiple times
 - Time is critical
 
+## The Cartographic Ensemble
+
+These historical figures inform the project's principles. Reference them in documentation as intellectual companions:
+
+| Figure | Principle | Application |
+|--------|-----------|-------------|
+| **William Smith** (1815) | Layer order matters | SVG z-index, rendering order |
+| **Henry David Thoreau** (1854) | Go to the source | Authoritative data, no speculation |
+| **Alexander von Humboldt** (1807) | Unity in diversity | Transformation reveals connections |
+| **Matthew Fontaine Maury** (1855) | Coordinate many sources | Pipeline aggregation |
+| **Florence Kelley** (1895) | Maps are evidence | Output serves comprehension |
+
 ## Local LLM Integration
 
 This repo works with [clood](https://github.com/dirtybirdnj/clood) for local LLM orchestration.
@@ -91,9 +158,7 @@ This repo works with [clood](https://github.com/dirtybirdnj/clood) for local LLM
 
 The `llm-context/` directory contains optimized documentation:
 - `TYPES.md` - All type definitions
-- `INTERFACES.md` - Interface contracts
 - `PATTERNS.md` - Code patterns to follow
-- `OPERATIONS.md` - Geometry operation specs
 
 When creating prompts for local LLMs, reference these files.
 
@@ -112,3 +177,5 @@ When creating prompts for local LLMs, reference these files.
 - Skip error handling
 - Use `panic` except for truly unrecoverable errors
 - Add dependencies not listed above without discussion
+- Name packages after historical figures (use functional names)
+- Write documentation without the narrative voice

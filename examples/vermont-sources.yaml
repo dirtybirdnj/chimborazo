@@ -1,0 +1,60 @@
+# Vermont with Named Sources
+# Demonstrates source reuse via named references
+#
+# Run with: chimborazo build examples/vermont-sources.yaml
+
+name: Vermont with Named Sources
+
+# Named data sources - reusable across layers and bounds
+sources:
+  state:
+    uri: census://state/VT
+  counties:
+    uri: census://county/VT
+  towns:
+    uri: file://~/Library/Caches/strata/census/tiger/2023/vt/cousub/tl_2023_50_cousub.shp
+
+output:
+  path: output/vermont-sources.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+
+# Use named source for bounds
+bounds:
+  source: state
+  padding: 0.05
+
+defaults:
+  style:
+    stroke: "#333333"
+    stroke_width: "1.0"
+    fill: "none"
+
+layers:
+  # Reference sources by name
+  - name: state_boundary
+    source: state
+    operations:
+      - type: clip
+    style:
+      stroke_width: "2.5"
+      order: "100"
+
+  - name: counties
+    source: counties
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      order: "50"
+
+  - name: towns
+    source: towns
+    operations:
+      - type: clip
+    style:
+      stroke: "#AAAAAA"
+      stroke_width: "0.3"
+      order: "25"
