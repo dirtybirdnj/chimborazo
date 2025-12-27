@@ -22,13 +22,15 @@ type DefaultsConfig struct {
 
 // OutputConfig defines output file settings
 type OutputConfig struct {
-	Path     string  `yaml:"path"`
-	Width    float64 `yaml:"width"`
-	Height   float64 `yaml:"height"`
-	Units    string  `yaml:"units"`      // "inches", "mm", "px"
-	PerLayer bool    `yaml:"per_layer"`  // Write each layer as separate SVG
-	Margin   float64 `yaml:"margin"`     // Margin in inches (default 0.5)
-	Quality  string  `yaml:"quality"`    // "low", "medium", "high", "plotter" (default "high")
+	Path           string  `yaml:"path"`
+	Width          float64 `yaml:"width"`
+	Height         float64 `yaml:"height"`
+	Units          string  `yaml:"units"`            // "inches", "mm", "px"
+	PerLayer       bool    `yaml:"per_layer"`        // Write each layer as separate SVG
+	Margin         float64 `yaml:"margin"`           // Margin in inches (default 0.5)
+	Quality        string  `yaml:"quality"`          // "low", "medium", "high", "plotter" (default "high")
+	MinFeatureSize float64 `yaml:"min_feature_size"` // Minimum feature size in mm (filters tiny features)
+	Rulers         bool    `yaml:"rulers"`           // Draw inch rulers on left and top edges
 }
 
 // QualityPreset defines simplification settings for a quality level.

@@ -14,17 +14,18 @@ import (
 
 // SVGWriter generates SVG output from geographic features.
 type SVGWriter struct {
-	Width  float64   // page width in inches
-	Height float64   // page height in inches
-	Margin float64   // margin in inches
-	Bounds orb.Bound // geographic bounds to render
-	DPI    float64   // dots per inch (default 96)
+	Width      float64   // page width in inches
+	Height     float64   // page height in inches
+	Margin     float64   // margin in inches
+	Bounds     orb.Bound // geographic bounds to render
+	DPI        float64   // dots per inch (default 96)
+	ShowRulers bool      // draw inch rulers on left and top edges
 }
 
 // Style defines the visual appearance of a feature.
 type Style struct {
 	Stroke      string  // stroke color (e.g., "#ff0000" or "none")
-	StrokeWidth float64 // stroke width in SVG units
+	StrokeWidth float64 // stroke width in mm (converted to pixels at render time)
 	Fill        string  // fill color (e.g., "#00ff00" or "none")
 	Opacity     float64 // overall opacity (0.0 - 1.0)
 }
@@ -44,7 +45,7 @@ type Layer struct {
 func DefaultStyle() Style {
 	return Style{
 		Stroke:      "#333333",
-		StrokeWidth: 1.0,
+		StrokeWidth: 0.3, // 0.3mm - typical pen plotter width
 		Fill:        "none",
 		Opacity:     1.0,
 	}
@@ -105,11 +106,17 @@ func (w *SVGWriter) projectPoint(p orb.Point) (float64, float64) {
 	return x, y
 }
 
+// mmToPixels converts millimeters to pixels at the current DPI.
+func (w *SVGWriter) mmToPixels(mm float64) float64 {
+	return (mm / 25.4) * w.DPI
+}
+
 // pointToPath converts a Point to an SVG circle element.
 func (w *SVGWriter) pointToPath(p orb.Point, style Style) string {
 	x, y := w.projectPoint(p)
-	return fmt.Sprintf(`<circle cx="%.2f" cy="%.2f" r="%.1f" stroke="%s" stroke-width="%.2f" fill="%s" opacity="%.2f"/>`,
-		x, y, style.StrokeWidth*2, style.Stroke, style.StrokeWidth, style.Fill, style.Opacity)
+	strokeWidthPx := w.mmToPixels(style.StrokeWidth)
+	return fmt.Sprintf(`<circle cx="%.2f" cy="%.2f" r="%.2f" stroke="%s" stroke-width="%.2f" fill="%s" opacity="%.2f"/>`,
+		x, y, strokeWidthPx*2, style.Stroke, strokeWidthPx, style.Fill, style.Opacity)
 }
 
 // lineStringToPath converts a LineString to an SVG path.
@@ -218,8 +225,9 @@ func (w *SVGWriter) WriteFeature(f *geometry.Feature, style Style) string {
 		return ""
 	}
 
+	strokeWidthPx := w.mmToPixels(style.StrokeWidth)
 	return fmt.Sprintf(`<path d="%s" stroke="%s" stroke-width="%.2f" fill="%s" opacity="%.2f" fill-rule="evenodd"/>`,
-		pathData, style.Stroke, style.StrokeWidth, style.Fill, style.Opacity)
+		pathData, style.Stroke, strokeWidthPx, style.Fill, style.Opacity)
 }
 
 // WriteCollection converts a FeatureCollection to SVG elements.
@@ -295,6 +303,68 @@ func clamp(val, min, max int) int {
 	return val
 }
 
+// renderRulers generates SVG elements for inch rulers on left and top edges.
+func (w *SVGWriter) renderRulers() string {
+	var sb strings.Builder
+	inchPx := w.DPI
+	marginPx := w.Margin * w.DPI
+	widthPx := w.Width * w.DPI
+	heightPx := w.Height * w.DPI
+
+	// 0.3mm line width (typical pen width)
+	lineWidthPx := (0.3 / 25.4) * w.DPI
+
+	sb.WriteString(fmt.Sprintf(`  <g id="rulers" stroke="#666666" stroke-width="%.2f" fill="none">
+`, lineWidthPx))
+
+	// Top ruler (horizontal, along the top edge)
+	// Draw ruler baseline
+	sb.WriteString(fmt.Sprintf(`    <line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>
+`, marginPx, marginPx, widthPx-marginPx, marginPx))
+
+	// Draw inch marks on top ruler
+	for i := 0; i <= int(w.Width-2*w.Margin); i++ {
+		x := marginPx + float64(i)*inchPx
+		// Full inch mark (longer)
+		sb.WriteString(fmt.Sprintf(`    <line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>
+`, x, marginPx, x, marginPx-10))
+		// Half inch mark
+		if i < int(w.Width-2*w.Margin) {
+			halfX := x + inchPx/2
+			sb.WriteString(fmt.Sprintf(`    <line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>
+`, halfX, marginPx, halfX, marginPx-6))
+		}
+		// Label
+		sb.WriteString(fmt.Sprintf(`    <text x="%.2f" y="%.2f" font-size="10" text-anchor="middle" fill="#666666">%d</text>
+`, x, marginPx-12, i))
+	}
+
+	// Left ruler (vertical, along the left edge)
+	// Draw ruler baseline
+	sb.WriteString(fmt.Sprintf(`    <line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>
+`, marginPx, marginPx, marginPx, heightPx-marginPx))
+
+	// Draw inch marks on left ruler
+	for i := 0; i <= int(w.Height-2*w.Margin); i++ {
+		y := marginPx + float64(i)*inchPx
+		// Full inch mark (longer)
+		sb.WriteString(fmt.Sprintf(`    <line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>
+`, marginPx, y, marginPx-10, y))
+		// Half inch mark
+		if i < int(w.Height-2*w.Margin) {
+			halfY := y + inchPx/2
+			sb.WriteString(fmt.Sprintf(`    <line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>
+`, marginPx, halfY, marginPx-6, halfY))
+		}
+		// Label
+		sb.WriteString(fmt.Sprintf(`    <text x="%.2f" y="%.2f" font-size="10" text-anchor="end" fill="#666666">%d</text>
+`, marginPx-12, y+3, i))
+	}
+
+	sb.WriteString("  </g>\n")
+	return sb.String()
+}
+
 // Render generates a complete SVG document from layers.
 func (w *SVGWriter) Render(layers []Layer) string {
 	widthPx := w.Width * w.DPI
@@ -324,6 +394,11 @@ func (w *SVGWriter) Render(layers []Layer) string {
 			sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
 		}
 		sb.WriteString("  </g>\n")
+	}
+
+	// Rulers (if enabled)
+	if w.ShowRulers {
+		sb.WriteString(w.renderRulers())
 	}
 
 	sb.WriteString("</svg>\n")

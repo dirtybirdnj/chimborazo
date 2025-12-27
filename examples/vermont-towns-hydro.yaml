@@ -1,0 +1,75 @@
+# Vermont Towns with Water Cut
+# Uses by_county subtract to cut water from land efficiently
+#
+# Run with: chimborazo build -v examples/vermont-towns-hydro.yaml
+
+name: Vermont Towns with Hydro
+
+output:
+  path: output/vermont-towns-hydro.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+  min_feature_size: 3  # Filter water features smaller than 3mm
+  rulers: true         # Draw inch rulers on left and top edges
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+layers:
+  # Water layer (rendered first, at bottom)
+  - name: water
+    source: census://areawater/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "10"
+
+  # Towns with water subtracted - colored by county
+  - name: towns
+    source: census://cousub/VT
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3  # Only subtract water features >= 3mm output size
+      - type: clip
+    fill_by: COUNTYFP
+    color_map:
+      "001": "#E8F5E9"   # Addison - light green
+      "003": "#FFF3E0"   # Bennington - light orange
+      "005": "#E3F2FD"   # Caledonia - light blue
+      "007": "#FCE4EC"   # Chittenden - light pink
+      "009": "#F3E5F5"   # Essex - light purple
+      "011": "#E0F7FA"   # Franklin - light cyan
+      "013": "#FFF8E1"   # Grand Isle - light amber
+      "015": "#E8EAF6"   # Lamoille - light indigo
+      "017": "#FFEBEE"   # Orange - light red
+      "019": "#E1F5FE"   # Orleans - light blue
+      "021": "#F1F8E9"   # Rutland - light lime
+      "023": "#FBE9E7"   # Washington - light deep orange
+      "025": "#E0F2F1"   # Windham - light teal
+      "027": "#EDE7F6"   # Windsor - light deep purple
+    vary_fill: true
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#EEEEEE"
+      order: "50"
+
+  # County boundaries (medium weight)
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+

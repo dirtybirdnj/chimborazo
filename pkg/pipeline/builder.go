@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -116,6 +117,7 @@ func (b *Builder) Build() (*BuildResult, error) {
 		margin,
 		bounds,
 	)
+	writer.ShowRulers = b.Recipe.Output.Rulers
 
 	// Step 6: Write to file(s)
 	if b.Recipe.Output.PerLayer {
@@ -248,6 +250,15 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 		features = geometry.SimplifyCollection(features, preset.Tolerance)
 	}
 
+	// Step 3.5: Filter out features smaller than min_feature_size (in mm)
+	if b.Recipe.Output.MinFeatureSize > 0 {
+		before := len(features)
+		features = b.filterByOutputSize(features, bounds, b.Recipe.Output.MinFeatureSize)
+		if len(features) != before {
+			b.logf("  Filtered by size (>%.1fmm): %d → %d features", b.Recipe.Output.MinFeatureSize, before, len(features))
+		}
+	}
+
 	// Step 4: Merge default styles with layer styles
 	mergedStyleMap := b.mergeStyles(b.Recipe.Defaults.Style, layerDef.Style)
 	style := b.parseStyle(mergedStyleMap)
@@ -306,7 +317,22 @@ func (b *Builder) applyOperation(op config.Operation, features geometry.FeatureC
 			return nil, fmt.Errorf("subtract requires 'source' parameter")
 		}
 
-		// Resolve the clip source
+		// Check for by_county mode
+		byCounty, _ := op.Params["by_county"].(bool)
+
+		// Check for min_size filter (in mm) - filters subtract source before subtracting
+		minSize := 0.0
+		if ms, ok := op.Params["min_size"].(float64); ok {
+			minSize = ms
+		} else if ms, ok := op.Params["min_size"].(int); ok {
+			minSize = float64(ms)
+		}
+
+		if byCounty {
+			return b.subtractByCounty(features, sourceURI, bounds, minSize)
+		}
+
+		// Standard subtraction - resolve all at once
 		clipFeatures, err := b.Resolver.Resolve(sourceURI)
 		if err != nil {
 			return nil, fmt.Errorf("resolving subtract source: %w", err)
@@ -357,6 +383,19 @@ func (b *Builder) applyOperation(op config.Operation, features geometry.FeatureC
 		b.logf("  Warning: buffer operation not yet implemented, skipping")
 		return features, nil
 
+	case "tag_output_size":
+		// Tag features with their rendered output size category
+		// Uses output dimensions from recipe to calculate mm size
+		return b.tagOutputSize(features, bounds)
+
+	case "filter_output_size":
+		// Filter features by minimum rendered output size in mm
+		minMM := 2.0 // default 2mm
+		if m, ok := op.Params["min_mm"].(float64); ok {
+			minMM = m
+		}
+		return b.filterOutputSize(features, bounds, minMM)
+
 	default:
 		return features, fmt.Errorf("unknown operation: %s", op.Type)
 	}
@@ -398,6 +437,258 @@ func (b *Builder) parseStyle(styleMap map[string]string) output.Style {
 	}
 
 	return style
+}
+
+// calculateOutputSizeMM calculates the rendered size of a feature's bounding box in mm.
+// Returns (widthMM, heightMM, maxDimensionMM).
+func (b *Builder) calculateOutputSizeMM(geomBounds orb.Bound, mapBounds orb.Bound) (float64, float64, float64) {
+	// Output dimensions in mm (convert from inches)
+	outputWidthMM := b.Recipe.Output.Width * 25.4
+	outputHeightMM := b.Recipe.Output.Height * 25.4
+	marginMM := b.Recipe.Output.Margin * 25.4
+	if marginMM == 0 {
+		marginMM = 0.5 * 25.4 // default 0.5 inch margin
+	}
+
+	// Drawable area
+	drawableWidthMM := outputWidthMM - 2*marginMM
+	drawableHeightMM := outputHeightMM - 2*marginMM
+
+	// Geographic extent
+	geoWidth := mapBounds.Max[0] - mapBounds.Min[0]
+	geoHeight := mapBounds.Max[1] - mapBounds.Min[1]
+
+	// Apply latitude correction (same as SVG writer)
+	centerLat := (mapBounds.Min[1] + mapBounds.Max[1]) / 2
+	latCorrection := math.Cos(centerLat * math.Pi / 180)
+	effectiveGeoWidth := geoWidth * latCorrection
+
+	// Scale to fit (maintain aspect ratio)
+	scaleX := drawableWidthMM / effectiveGeoWidth
+	scaleY := drawableHeightMM / geoHeight
+	scale := scaleX
+	if scaleY < scaleX {
+		scale = scaleY
+	}
+
+	// Feature's geographic size
+	featureGeoWidth := (geomBounds.Max[0] - geomBounds.Min[0]) * latCorrection
+	featureGeoHeight := geomBounds.Max[1] - geomBounds.Min[1]
+
+	// Convert to output mm
+	widthMM := featureGeoWidth * scale
+	heightMM := featureGeoHeight * scale
+	maxMM := widthMM
+	if heightMM > maxMM {
+		maxMM = heightMM
+	}
+
+	return widthMM, heightMM, maxMM
+}
+
+// tagOutputSize tags each feature with its rendered output size category.
+// Categories: "<1mm", "1-2mm", "2-3mm", "3-5mm", ">5mm"
+func (b *Builder) tagOutputSize(features geometry.FeatureCollection, mapBounds orb.Bound) (geometry.FeatureCollection, error) {
+	counts := make(map[string]int)
+
+	for _, f := range features {
+		if f.Geometry == nil {
+			continue
+		}
+
+		geomBounds := f.Geometry.Bound()
+		_, _, maxMM := b.calculateOutputSizeMM(geomBounds, mapBounds)
+
+		var category string
+		switch {
+		case maxMM < 1.0:
+			category = "<1mm"
+		case maxMM < 2.0:
+			category = "1-2mm"
+		case maxMM < 3.0:
+			category = "2-3mm"
+		case maxMM < 5.0:
+			category = "3-5mm"
+		default:
+			category = ">5mm"
+		}
+
+		f.Properties["output_size"] = category
+		counts[category]++
+	}
+
+	b.logf("  Tagged features by output size: <1mm=%d, 1-2mm=%d, 2-3mm=%d, 3-5mm=%d, >5mm=%d",
+		counts["<1mm"], counts["1-2mm"], counts["2-3mm"], counts["3-5mm"], counts[">5mm"])
+
+	return features, nil
+}
+
+// filterOutputSize removes features smaller than minMM in their largest dimension.
+func (b *Builder) filterOutputSize(features geometry.FeatureCollection, mapBounds orb.Bound, minMM float64) (geometry.FeatureCollection, error) {
+	var result geometry.FeatureCollection
+	filtered := 0
+
+	for _, f := range features {
+		if f.Geometry == nil {
+			continue
+		}
+
+		geomBounds := f.Geometry.Bound()
+		_, _, maxMM := b.calculateOutputSizeMM(geomBounds, mapBounds)
+
+		if maxMM >= minMM {
+			result = append(result, f)
+		} else {
+			filtered++
+		}
+	}
+
+	b.logf("  Filtered by output size (min %.1fmm): %d → %d features (%d removed)",
+		minMM, len(features), len(result), filtered)
+
+	return result, nil
+}
+
+// filterByOutputSize removes features that would render smaller than minMM in the output.
+// A feature is kept if EITHER its width OR height exceeds the threshold (preserves thin features like bays).
+func (b *Builder) filterByOutputSize(features geometry.FeatureCollection, bounds orb.Bound, minMM float64) geometry.FeatureCollection {
+	// Calculate mm per degree for this output
+	// Output dimensions in mm (assuming inches, convert to mm)
+	outputWidthMM := b.Recipe.Output.Width * 25.4
+	outputHeightMM := b.Recipe.Output.Height * 25.4
+
+	// Account for margins
+	margin := b.Recipe.Output.Margin
+	if margin == 0 {
+		margin = 0.5
+	}
+	marginMM := margin * 25.4
+	drawableWidthMM := outputWidthMM - 2*marginMM
+	drawableHeightMM := outputHeightMM - 2*marginMM
+
+	// Geographic extent
+	geoWidth := bounds.Max[0] - bounds.Min[0]
+	geoHeight := bounds.Max[1] - bounds.Min[1]
+
+	// Scale factors (mm per degree)
+	scaleX := drawableWidthMM / geoWidth
+	scaleY := drawableHeightMM / geoHeight
+	// Use the smaller scale to maintain aspect ratio
+	scale := scaleX
+	if scaleY < scaleX {
+		scale = scaleY
+	}
+
+	var result geometry.FeatureCollection
+	for _, f := range features {
+		if f == nil || f.Geometry == nil {
+			continue
+		}
+
+		// Get feature's bounding box
+		featureBounds := f.Geometry.Bound()
+		featureWidth := featureBounds.Max[0] - featureBounds.Min[0]
+		featureHeight := featureBounds.Max[1] - featureBounds.Min[1]
+
+		// Convert to mm
+		widthMM := featureWidth * scale
+		heightMM := featureHeight * scale
+
+		// Keep if EITHER dimension exceeds threshold (preserves thin features)
+		if widthMM >= minMM || heightMM >= minMM {
+			result = append(result, f)
+		}
+	}
+
+	return result
+}
+
+// subtractByCounty performs water subtraction county-by-county to avoid polygon limits.
+// It groups input features by COUNTYFP, fetches water for each county, and subtracts.
+func (b *Builder) subtractByCounty(features geometry.FeatureCollection, sourceURI string, bounds orb.Bound, minSizeMM float64) (geometry.FeatureCollection, error) {
+	// Parse the source URI to get state info
+	parsed, err := sources.ParseCensusURI(sourceURI)
+	if err != nil {
+		return nil, fmt.Errorf("by_county requires a census:// URI: %w", err)
+	}
+
+	// Group features by COUNTYFP
+	countyGroups := make(map[string]geometry.FeatureCollection)
+	for _, f := range features {
+		countyFP := ""
+		if fp, ok := f.Properties["COUNTYFP"].(string); ok {
+			countyFP = fp
+		} else if fp, ok := f.Properties["COUNTYFP20"].(string); ok {
+			countyFP = fp
+		}
+		if countyFP == "" {
+			// Features without COUNTYFP go into a special group
+			countyFP = "_unknown"
+		}
+		countyGroups[countyFP] = append(countyGroups[countyFP], f)
+	}
+
+	b.logf("  Grouped %d features into %d counties for by_county subtract", len(features), len(countyGroups))
+
+	// Process each county
+	var result geometry.FeatureCollection
+	for countyFP, countyFeatures := range countyGroups {
+		if countyFP == "_unknown" {
+			// Can't subtract water from features without county info
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		// Construct per-county water URI
+		// e.g., census://areawater/VT becomes a URL like tl_2023_50007_areawater.zip for county 007
+		fullFIPS := parsed.StateFIPS + countyFP
+		waterURL := fmt.Sprintf("https://www2.census.gov/geo/tiger/TIGER%s/%s/tl_%s_%s_%s.zip",
+			parsed.Year, parsed.TypeInfo.Folder, parsed.Year, fullFIPS, parsed.Type)
+
+		b.logf("    County %s: %d features, fetching water...", countyFP, len(countyFeatures))
+
+		// Fetch water for this county
+		waterFeatures, err := b.Resolver.Resolve(waterURL)
+		if err != nil {
+			b.logf("    Warning: could not fetch water for county %s: %v", countyFP, err)
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		if len(waterFeatures) == 0 {
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		// Filter water by min_size if specified
+		if minSizeMM > 0 {
+			before := len(waterFeatures)
+			waterFeatures = b.filterByOutputSize(waterFeatures, bounds, minSizeMM)
+			if len(waterFeatures) != before {
+				b.logf("    County %s: filtered water by size (>%.1fmm): %d → %d", countyFP, minSizeMM, before, len(waterFeatures))
+			}
+		}
+
+		if len(waterFeatures) == 0 {
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		b.logf("    County %s: subtracting %d water features", countyFP, len(waterFeatures))
+
+		// Subtract water from this county's features
+		subtracted, err := geometry.SubtractCollection(countyFeatures, waterFeatures)
+		if err != nil {
+			b.logf("    Warning: subtract failed for county %s: %v", countyFP, err)
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		result = append(result, subtracted...)
+	}
+
+	b.logf("  By-county subtract complete: %d → %d features", len(features), len(result))
+	return result, nil
 }
 
 // logf prints a message if verbose mode is enabled.

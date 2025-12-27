@@ -1,0 +1,71 @@
+# Vermont Water Size Analysis
+# Visualizes water features by their rendered output size
+# Helps determine the right filter threshold for plotter output
+#
+# Run with: chimborazo build -v examples/vermont-size-analysis.yaml
+
+name: Vermont Water Size Analysis
+
+output:
+  path: output/vermont-size-analysis.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+layers:
+  # Towns (light gray background) - render at bottom
+  - name: towns
+    source: census://cousub/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#CCCCCC"
+      stroke_width: "0.2"
+      fill: "#F5F5F5"
+      order: "100"
+
+  # Water features color-coded by output size - render on top of towns
+  - name: water_by_size
+    source: census://areawater/VT
+    operations:
+      - type: clip
+      - type: tag_output_size
+    fill_by: output_size
+    color_map:
+      "<1mm": "#F44336"      # Red - would filter at 1mm threshold
+      "1-2mm": "#FF9800"     # Orange - would filter at 2mm threshold
+      "2-3mm": "#FFEB3B"     # Yellow - would filter at 3mm threshold
+      "3-5mm": "#8BC34A"     # Light green - medium features
+      ">5mm": "#2196F3"      # Blue - large features (always keep)
+    style:
+      stroke: "#333333"
+      stroke_width: "0.3"
+      fill: "#B3E5FC"
+      order: "50"
+
+  # County boundaries for reference - render on top of water
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "1.0"
+      fill: "none"
+      order: "20"
+
+  # State boundary - render last (topmost)
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "10"
