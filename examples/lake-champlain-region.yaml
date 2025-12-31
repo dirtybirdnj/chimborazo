@@ -13,7 +13,7 @@ output:
   height: 24
   units: inches
   quality: high
-  min_feature_size: 3
+  min_feature_size: 0
   rulers: true
 
 bounds:

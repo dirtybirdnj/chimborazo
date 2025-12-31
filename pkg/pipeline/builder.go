@@ -110,8 +110,13 @@ func (b *Builder) Build() (*BuildResult, error) {
 	for name, emitted := range b.emittedLayers {
 		b.logf("Adding emitted layer: %s (%d features)", name, len(emitted.Features))
 
+		// Clip emitted features to bounds (they come from subtract which doesn't clip)
+		features := geometry.ClipCollection(emitted.Features, bounds)
+		if len(features) != len(emitted.Features) {
+			b.logf("  Clipped to bounds: %d → %d features", len(emitted.Features), len(features))
+		}
+
 		// Filter by min_feature_size if set
-		features := emitted.Features
 		if b.Recipe.Output.MinFeatureSize > 0 {
 			before := len(features)
 			features = b.filterByOutputSize(features, bounds, b.Recipe.Output.MinFeatureSize)
