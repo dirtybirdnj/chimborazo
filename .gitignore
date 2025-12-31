@@ -1,0 +1,5 @@
+
+# Build artifacts
+chimborazo
+output/
+.DS_Store

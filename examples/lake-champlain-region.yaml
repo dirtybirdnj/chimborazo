@@ -17,10 +17,10 @@ output:
   rulers: true
 
 bounds:
-  # Full Lake Champlain / Richelieu Corridor region
-  # Extends north to show Quebec municipalities and eventually St. Lawrence
+  # Centered on Lake Champlain
+  # Lake extends from ~43.0°N (Crown Point) to ~45.1°N (Missisquoi Bay)
   # [West, South, East, North]
-  explicit: [-74.5, 42.0, -70.5, 46.0]
+  explicit: [-74.0, 43.0, -72.0, 45.5]
   padding: 0.02
 
 layers:
@@ -149,6 +149,8 @@ layers:
       order: "80"
 
   # Quebec municipalities (Canadian data)
+  # Note: No water subtraction - algorithm can't handle 533 municipalities at once
+  # Water is overlaid on top via NHN layers
   - name: quebec_muni
     source: quebec://municipalities
     operations:
@@ -158,6 +160,27 @@ layers:
       stroke_width: "0.3"
       fill: "#E8EAF6"  # Light indigo for Quebec
       order: "50"
+
+  # NHN water for Lake Champlain Quebec portion (Missisquoi Bay area)
+  # Rendered on top of Quebec municipalities
+  - name: water_quebec_champlain
+    source: canada://nhn/02OHB00
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "45"
+
+  # NHN water for Richelieu River corridor
+  - name: water_richelieu
+    source: canada://nhn/02OJ000
+    operations:
+      - type: clip
+    style:
+      stroke: "none"
+      fill: "#B3E5FC"
+      order: "45"
 
   # Quebec MRC (Regional County Municipality) boundaries
   - name: quebec_mrc
@@ -169,16 +192,6 @@ layers:
       stroke_width: "0.5"
       fill: "none"
       order: "75"
-
-  # Canadian hydro (CanVec national coverage)
-  - name: canada_hydro
-    source: canada://canvec/hydro
-    operations:
-      - type: clip
-    style:
-      stroke: "none"
-      fill: "#B3E5FC"
-      order: "10"
 
   # State/Province boundaries (rendered on top)
   - name: state_vt

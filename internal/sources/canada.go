@@ -119,17 +119,17 @@ func (c *CanadaURI) CacheKey() string {
 
 // ShapefilePattern returns the glob pattern to find the relevant shapefile.
 // NHN archives contain multiple shapefiles:
-//   - *_waterbody_2.shp - Area water (lakes, ponds)
-//   - *_slwater_2.shp - Single-line water (rivers, streams as lines)
+//   - *_HD_WATERBODY_2.shp - Area water (lakes, ponds)
+//   - *_HD_SLWATER_1.shp - Single-line water (rivers, streams as lines)
 // CanVec hydro contains:
 //   - waterbody_2.shp - Area water
 //   - water_linear_flow_1.shp - Linear water (rivers)
 func (c *CanadaURI) ShapefilePattern() string {
 	if c.Source == "nhn" {
 		if c.SubType == "rivers" {
-			return "*_slwater_*.shp" // Linear water
+			return "*SLWATER*.shp" // Linear water (uppercase in NHN)
 		}
-		return "*_waterbody_*.shp" // Area water (default)
+		return "*WATERBODY*.shp" // Area water (uppercase in NHN)
 	}
 	// CanVec hydro - use waterbody for polygons
 	if c.SubType == "rivers" {
