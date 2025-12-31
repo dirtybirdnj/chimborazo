@@ -1,0 +1,53 @@
+# Vermont Towns with Unified Water Layer
+# Uses emit_as to ensure water display matches water subtraction exactly
+#
+# Run with: chimborazo build examples/vermont-unified-water.yaml
+
+name: Vermont Towns (Unified Water)
+
+output:
+  path: output/vermont-unified-water.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+  min_feature_size: 3
+  rulers: true
+
+bounds:
+  source: census://state/VT
+  padding: 0.02
+
+layers:
+  # Towns with water subtraction - emits water as a separate layer
+  # The emit_as creates a "water" layer with the EXACT features used for subtraction
+  - name: towns
+    source: census://cousub/VT
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3
+          emit_as: water
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E8F5E9"
+      order: "50"
+
+  # County boundaries
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"

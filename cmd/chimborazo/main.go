@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ reaching 19,286 feet - higher than any European had ever stood.`,
 	// Subcommands
 	rootCmd.AddCommand(buildCmd())
 	rootCmd.AddCommand(validateCmd())
+	rootCmd.AddCommand(analyzeCmd())
 	rootCmd.AddCommand(cacheCmd())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -114,6 +116,111 @@ func validateCmd() *cobra.Command {
 			fmt.Printf("✓ Recipe valid: %s (%d layers)\n", recipe.Name, len(recipe.Layers))
 		},
 	}
+}
+
+func analyzeCmd() *cobra.Command {
+	var verbose bool
+	var debugOutput bool
+	var generatePNG bool
+	var openResult bool
+
+	cmd := &cobra.Command{
+		Use:   "analyze [recipe.yaml]",
+		Short: "Build and analyze a map for visual errors",
+		Long: `Builds a map and analyzes it for potential visual errors such as:
+- Water/cutout mismatches (holes in polygons without corresponding water fill)
+- Overlapping features that may cause rendering issues
+- Features that exceed bounds
+
+Use --debug to generate a debug overlay SVG highlighting issues.
+Use --png to generate a PNG preview for visual inspection.
+Use --open to open the result in default viewer.`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			recipePath := args[0]
+
+			if verbose {
+				fmt.Printf("Loading recipe: %s\n", recipePath)
+			}
+
+			recipe, err := config.LoadRecipe(recipePath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading recipe: %v\n", err)
+				os.Exit(1)
+			}
+
+			builder, err := pipeline.NewBuilder(recipe, getCacheDir())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating builder: %v\n", err)
+				os.Exit(1)
+			}
+			builder.Verbose = verbose
+
+			// Build with analysis enabled
+			result, analysis, err := builder.BuildWithAnalysis()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Build failed: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("✓ Built %s (%d layers, %d features) in %v\n",
+				result.OutputPath, result.LayerCount, result.FeatureCount, result.Duration)
+
+			// Report analysis results
+			fmt.Println("\n=== Analysis Results ===")
+			if len(analysis.Warnings) == 0 {
+				fmt.Println("✓ No issues detected")
+			} else {
+				for _, w := range analysis.Warnings {
+					fmt.Printf("⚠ %s\n", w)
+				}
+			}
+
+			// Generate PNG preview for visual inspection
+			if generatePNG {
+				pngPath := "/tmp/" + filepath.Base(result.OutputPath) + ".png"
+				fmt.Printf("\nGenerating PNG preview: %s\n", pngPath)
+
+				// Use qlmanage on macOS to generate PNG
+				execCmd := exec.Command("qlmanage", "-t", "-s", "2000", "-o", "/tmp", result.OutputPath)
+				if err := execCmd.Run(); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not generate PNG (qlmanage failed): %v\n", err)
+				} else {
+					fmt.Printf("✓ PNG preview: %s\n", pngPath)
+					fmt.Println("\n=== Visual Inspection Checklist ===")
+					fmt.Println("□ Check water bodies have blue fill (no green/town color showing)")
+					fmt.Println("□ Check town boundaries align with water edges")
+					fmt.Println("□ Check for orphan features (small dots or specks)")
+					fmt.Println("□ Check state/province boundaries are continuous")
+
+					if openResult {
+						exec.Command("open", pngPath).Run()
+					}
+				}
+			}
+
+			if debugOutput && len(analysis.Warnings) > 0 {
+				debugPath := result.OutputPath[:len(result.OutputPath)-4] + "_debug.svg"
+				if err := builder.WriteDebugOverlay(debugPath, analysis); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not write debug overlay: %v\n", err)
+				} else {
+					fmt.Printf("\n✓ Debug overlay written to %s\n", debugPath)
+				}
+			}
+
+			// Open SVG if requested
+			if openResult && !generatePNG {
+				exec.Command("open", result.OutputPath).Run()
+			}
+		},
+	}
+
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed progress")
+	cmd.Flags().BoolVarP(&debugOutput, "debug", "d", false, "Generate debug overlay SVG")
+	cmd.Flags().BoolVarP(&generatePNG, "png", "p", false, "Generate PNG preview for visual inspection")
+	cmd.Flags().BoolVarP(&openResult, "open", "o", false, "Open result in default viewer")
+
+	return cmd
 }
 
 func cacheCmd() *cobra.Command {

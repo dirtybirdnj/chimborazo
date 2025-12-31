@@ -111,6 +111,16 @@ func (r *Resolver) resolveCensus(uri string) (geometry.FeatureCollection, error)
 		return ReadShapefile(filteredPath)
 	}
 
+	// Check for county subdirectories (multi-file per-county data)
+	// These need to be re-merged from cached county shapefiles
+	if parsed.IsMultiFile() {
+		countyDirs, _ := filepath.Glob(filepath.Join(sourceDir, "county_*"))
+		if len(countyDirs) > 0 {
+			r.logf("Using cached (re-merging %d counties): %s", len(countyDirs), uri)
+			return r.mergeCountyCache(countyDirs)
+		}
+	}
+
 	// Check for single shapefile
 	existingShp, _ := FindShapefile(sourceDir)
 	if existingShp != "" {
@@ -248,6 +258,33 @@ func (r *Resolver) downloadAndMergeCounties(parsed *CensusURI, destDir string) (
 
 	r.logf("Merged %d features from %d/%d counties", len(allFeatures), successCount, len(parsed.URLs))
 
+	return allFeatures, nil
+}
+
+// mergeCountyCache re-reads and merges cached county shapefiles.
+func (r *Resolver) mergeCountyCache(countyDirs []string) (geometry.FeatureCollection, error) {
+	var allFeatures geometry.FeatureCollection
+
+	for _, countyDir := range countyDirs {
+		shpPath, err := FindShapefile(countyDir)
+		if err != nil {
+			continue // Skip directories without shapefiles
+		}
+
+		features, err := ReadShapefile(shpPath)
+		if err != nil {
+			r.logf("Warning: could not read %s: %v", shpPath, err)
+			continue
+		}
+
+		allFeatures = append(allFeatures, features...)
+	}
+
+	if len(allFeatures) == 0 {
+		return nil, fmt.Errorf("no features found in cached county directories")
+	}
+
+	r.logf("Re-merged %d features from %d county caches", len(allFeatures), len(countyDirs))
 	return allFeatures, nil
 }
 

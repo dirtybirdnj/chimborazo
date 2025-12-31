@@ -21,9 +21,17 @@ import (
 
 // Builder orchestrates the map building process.
 type Builder struct {
-	Recipe   *config.Recipe
-	Resolver *sources.Resolver
-	Verbose  bool
+	Recipe        *config.Recipe
+	Resolver      *sources.Resolver
+	Verbose       bool
+	emittedLayers map[string]*emittedLayer // Layers created by operations (e.g., subtract with emit_as)
+}
+
+// emittedLayer holds features emitted by an operation for later rendering.
+type emittedLayer struct {
+	Features geometry.FeatureCollection
+	Style    map[string]string
+	Order    int
 }
 
 // BuildResult contains the outcome of a build.
@@ -37,6 +45,13 @@ type BuildResult struct {
 	Warnings     []string
 }
 
+// AnalysisResult contains findings from post-build analysis.
+type AnalysisResult struct {
+	Warnings      []string
+	HolesWithoutFill []orb.Bound // Polygon holes with no corresponding water
+	FillWithoutHole  []orb.Bound // Water features with no corresponding hole
+}
+
 // NewBuilder creates a pipeline builder for a recipe.
 func NewBuilder(recipe *config.Recipe, cacheDir string) (*Builder, error) {
 	resolver, err := sources.NewResolver(cacheDir)
@@ -45,8 +60,9 @@ func NewBuilder(recipe *config.Recipe, cacheDir string) (*Builder, error) {
 	}
 
 	return &Builder{
-		Recipe:   recipe,
-		Resolver: resolver,
+		Recipe:        recipe,
+		Resolver:      resolver,
+		emittedLayers: make(map[string]*emittedLayer),
 	}, nil
 }
 
@@ -88,6 +104,30 @@ func (b *Builder) Build() (*BuildResult, error) {
 			result.FeatureCount += len(layer.Features)
 			b.logf("  %d features", len(layer.Features))
 		}
+	}
+
+	// Step 3.5: Add emitted layers (from subtract with emit_as, etc.)
+	for name, emitted := range b.emittedLayers {
+		b.logf("Adding emitted layer: %s (%d features)", name, len(emitted.Features))
+
+		// Filter by min_feature_size if set
+		features := emitted.Features
+		if b.Recipe.Output.MinFeatureSize > 0 {
+			before := len(features)
+			features = b.filterByOutputSize(features, bounds, b.Recipe.Output.MinFeatureSize)
+			if len(features) != before {
+				b.logf("  Filtered by size (>%.1fmm): %d → %d features", b.Recipe.Output.MinFeatureSize, before, len(features))
+			}
+		}
+
+		style := b.parseStyle(emitted.Style)
+		layers = append(layers, output.Layer{
+			Name:     name,
+			Features: features,
+			Style:    style,
+			Order:    emitted.Order,
+		})
+		result.FeatureCount += len(features)
 	}
 
 	// Sort layers by order (higher order = render first = bottom of stack)
@@ -151,6 +191,102 @@ func (b *Builder) Build() (*BuildResult, error) {
 
 	result.Duration = time.Since(start)
 	return result, nil
+}
+
+// BuildWithAnalysis builds the map and performs validation analysis.
+func (b *Builder) BuildWithAnalysis() (*BuildResult, *AnalysisResult, error) {
+	result, err := b.Build()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	analysis := &AnalysisResult{}
+
+	// Check for emit_as usage (ideal case - no mismatches possible)
+	hasEmitAs := false
+	for _, layer := range b.Recipe.Layers {
+		for _, op := range layer.Operations {
+			if op.Type == "subtract" {
+				if _, ok := op.Params["emit_as"]; ok {
+					hasEmitAs = true
+				}
+			}
+		}
+	}
+
+	if hasEmitAs {
+		analysis.Warnings = append(analysis.Warnings,
+			"Using emit_as for water layers - alignment guaranteed")
+	}
+
+	// Check for separate water layers without emit_as (potential mismatch)
+	waterLayers := 0
+	subtractOps := 0
+	for _, layer := range b.Recipe.Layers {
+		if strings.Contains(strings.ToLower(layer.Name), "water") {
+			waterLayers++
+		}
+		for _, op := range layer.Operations {
+			if op.Type == "subtract" {
+				if _, ok := op.Params["emit_as"]; !ok {
+					subtractOps++
+				}
+			}
+		}
+	}
+
+	if waterLayers > 0 && subtractOps > 0 && !hasEmitAs {
+		analysis.Warnings = append(analysis.Warnings,
+			fmt.Sprintf("Found %d separate water layers and %d subtract operations without emit_as - potential alignment issues", waterLayers, subtractOps))
+	}
+
+	// Check for min_feature_size mismatch
+	outputMinSize := b.Recipe.Output.MinFeatureSize
+	for _, layer := range b.Recipe.Layers {
+		for _, op := range layer.Operations {
+			if op.Type == "subtract" {
+				if minSize, ok := op.Params["min_size"].(float64); ok {
+					if minSize != outputMinSize && outputMinSize > 0 {
+						analysis.Warnings = append(analysis.Warnings,
+							fmt.Sprintf("Layer %s: subtract min_size (%.1f) differs from output min_feature_size (%.1f) - may cause display mismatches",
+								layer.Name, minSize, outputMinSize))
+					}
+				}
+			}
+		}
+	}
+
+	return result, analysis, nil
+}
+
+// WriteDebugOverlay writes an SVG showing analysis findings.
+func (b *Builder) WriteDebugOverlay(path string, analysis *AnalysisResult) error {
+	// For now, just write warnings as text
+	// TODO: Implement visual overlay with problem areas highlighted
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	f.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+<style>
+  text { font-family: monospace; font-size: 14px; }
+  .warning { fill: #ff6600; }
+  .header { font-size: 18px; font-weight: bold; }
+</style>
+<text x="20" y="30" class="header">Analysis Warnings</text>
+`)
+
+	y := 60
+	for _, w := range analysis.Warnings {
+		fmt.Fprintf(f, `<text x="20" y="%d" class="warning">⚠ %s</text>`+"\n", y, w)
+		y += 25
+	}
+
+	f.WriteString("</svg>")
+	return nil
 }
 
 // resolveBounds determines the geographic extent for the map.
@@ -328,8 +464,39 @@ func (b *Builder) applyOperation(op config.Operation, features geometry.FeatureC
 			minSize = float64(ms)
 		}
 
+		// Check for emit_as - emits the subtracted features as a separate layer
+		// This ensures the water display layer uses EXACTLY the same features as subtraction
+		emitAs, _ := op.Params["emit_as"].(string)
+		emitStyle := make(map[string]string)
+		if style, ok := op.Params["emit_style"].(map[string]interface{}); ok {
+			for k, v := range style {
+				if s, ok := v.(string); ok {
+					emitStyle[k] = s
+				}
+			}
+		}
+		emitOrder := 10 // Default to low order (rendered first/bottom)
+		if order, ok := op.Params["emit_order"].(int); ok {
+			emitOrder = order
+		} else if order, ok := op.Params["emit_order"].(float64); ok {
+			emitOrder = int(order)
+		}
+
 		if byCounty {
-			return b.subtractByCounty(features, sourceURI, bounds, minSize)
+			result, waterUsed, err := b.subtractByCountyWithEmit(features, sourceURI, bounds, minSize)
+			if err != nil {
+				return nil, err
+			}
+			// Emit water layer if requested
+			if emitAs != "" && len(waterUsed) > 0 {
+				b.emittedLayers[emitAs] = &emittedLayer{
+					Features: waterUsed,
+					Style:    emitStyle,
+					Order:    emitOrder,
+				}
+				b.logf("  Emitting %d water features as layer '%s'", len(waterUsed), emitAs)
+			}
+			return result, nil
 		}
 
 		// Standard subtraction - resolve all at once
@@ -342,7 +509,22 @@ func (b *Builder) applyOperation(op config.Operation, features geometry.FeatureC
 			return features, nil // Nothing to subtract
 		}
 
+		// Filter by min_size if specified
+		if minSize > 0 {
+			clipFeatures = b.filterByOutputSize(clipFeatures, bounds, minSize)
+		}
+
 		b.logf("  Subtracting %d features from %s", len(clipFeatures), sourceURI)
+
+		// Emit water layer if requested
+		if emitAs != "" && len(clipFeatures) > 0 {
+			b.emittedLayers[emitAs] = &emittedLayer{
+				Features: clipFeatures,
+				Style:    emitStyle,
+				Order:    emitOrder,
+			}
+			b.logf("  Emitting %d water features as layer '%s'", len(clipFeatures), emitAs)
+		}
 
 		// Perform the subtraction
 		result, err := geometry.SubtractCollection(features, clipFeatures)
@@ -689,6 +871,97 @@ func (b *Builder) subtractByCounty(features geometry.FeatureCollection, sourceUR
 
 	b.logf("  By-county subtract complete: %d → %d features", len(features), len(result))
 	return result, nil
+}
+
+// subtractByCountyWithEmit performs water subtraction county-by-county and returns
+// both the result AND the water features that were used for subtraction.
+// This enables the emit_as feature to create a water layer with exactly the same features.
+func (b *Builder) subtractByCountyWithEmit(features geometry.FeatureCollection, sourceURI string, bounds orb.Bound, minSizeMM float64) (geometry.FeatureCollection, geometry.FeatureCollection, error) {
+	// Parse the source URI to get state info
+	parsed, err := sources.ParseCensusURI(sourceURI)
+	if err != nil {
+		return nil, nil, fmt.Errorf("by_county requires a census:// URI: %w", err)
+	}
+
+	// Group features by COUNTYFP
+	countyGroups := make(map[string]geometry.FeatureCollection)
+	for _, f := range features {
+		countyFP := ""
+		if fp, ok := f.Properties["COUNTYFP"].(string); ok {
+			countyFP = fp
+		} else if fp, ok := f.Properties["COUNTYFP20"].(string); ok {
+			countyFP = fp
+		}
+		if countyFP == "" {
+			countyFP = "_unknown"
+		}
+		countyGroups[countyFP] = append(countyGroups[countyFP], f)
+	}
+
+	b.logf("  Grouped %d features into %d counties for by_county subtract", len(features), len(countyGroups))
+
+	// Process each county
+	var result geometry.FeatureCollection
+	var allWaterUsed geometry.FeatureCollection
+
+	for countyFP, countyFeatures := range countyGroups {
+		if countyFP == "_unknown" {
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		// Construct per-county water URI
+		fullFIPS := parsed.StateFIPS + countyFP
+		waterURL := fmt.Sprintf("https://www2.census.gov/geo/tiger/TIGER%s/%s/tl_%s_%s_%s.zip",
+			parsed.Year, parsed.TypeInfo.Folder, parsed.Year, fullFIPS, parsed.Type)
+
+		b.logf("    County %s: %d features, fetching water...", countyFP, len(countyFeatures))
+
+		// Fetch water for this county
+		waterFeatures, err := b.Resolver.Resolve(waterURL)
+		if err != nil {
+			b.logf("    Warning: could not fetch water for county %s: %v", countyFP, err)
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		if len(waterFeatures) == 0 {
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		// Filter water by min_size if specified
+		if minSizeMM > 0 {
+			before := len(waterFeatures)
+			waterFeatures = b.filterByOutputSize(waterFeatures, bounds, minSizeMM)
+			if len(waterFeatures) != before {
+				b.logf("    County %s: filtered water by size (>%.1fmm): %d → %d", countyFP, minSizeMM, before, len(waterFeatures))
+			}
+		}
+
+		if len(waterFeatures) == 0 {
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		// Collect water features for emission
+		allWaterUsed = append(allWaterUsed, waterFeatures...)
+
+		b.logf("    County %s: subtracting %d water features", countyFP, len(waterFeatures))
+
+		// Subtract water from this county's features
+		subtracted, err := geometry.SubtractCollection(countyFeatures, waterFeatures)
+		if err != nil {
+			b.logf("    Warning: subtract failed for county %s: %v", countyFP, err)
+			result = append(result, countyFeatures...)
+			continue
+		}
+
+		result = append(result, subtracted...)
+	}
+
+	b.logf("  By-county subtract complete: %d → %d features, collected %d water features", len(features), len(result), len(allWaterUsed))
+	return result, allWaterUsed, nil
 }
 
 // logf prints a message if verbose mode is enabled.

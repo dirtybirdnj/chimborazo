@@ -1,6 +1,8 @@
 # Lake Champlain Region - Multi-State/Province Map
 # Includes: Vermont, New York, New Hampshire, Massachusetts, Quebec
 #
+# Uses emit_as for unified water layers - ensures water display matches cutouts exactly
+#
 # Run with: chimborazo build examples/lake-champlain-region.yaml
 
 name: Lake Champlain Region with Quebec
@@ -22,44 +24,9 @@ bounds:
   padding: 0.02
 
 layers:
-  # Water layer (rendered first, at bottom)
-  - name: water_vt
-    source: census://areawater/VT
-    operations:
-      - type: clip
-    style:
-      stroke: "none"
-      fill: "#B3E5FC"
-      order: "10"
+  # Towns/cousubs for each state - emit water layers via subtract operation
+  # This ensures water display matches cutouts exactly (no offset issues)
 
-  - name: water_ny
-    source: census://areawater/NY
-    operations:
-      - type: clip
-    style:
-      stroke: "none"
-      fill: "#B3E5FC"
-      order: "10"
-
-  - name: water_nh
-    source: census://areawater/NH
-    operations:
-      - type: clip
-    style:
-      stroke: "none"
-      fill: "#B3E5FC"
-      order: "10"
-
-  - name: water_ma
-    source: census://areawater/MA
-    operations:
-      - type: clip
-    style:
-      stroke: "none"
-      fill: "#B3E5FC"
-      order: "10"
-
-  # Towns/cousubs for each state - colored by state
   - name: towns_vt
     source: census://cousub/VT
     operations:
@@ -68,6 +35,11 @@ layers:
           source: census://areawater/VT
           by_county: true
           min_size: 3
+          emit_as: water_vt
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
@@ -83,6 +55,11 @@ layers:
           source: census://areawater/NY
           by_county: true
           min_size: 3
+          emit_as: water_ny
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
@@ -98,6 +75,11 @@ layers:
           source: census://areawater/NH
           by_county: true
           min_size: 3
+          emit_as: water_nh
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
@@ -113,6 +95,11 @@ layers:
           source: census://areawater/MA
           by_county: true
           min_size: 3
+          emit_as: water_ma
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
