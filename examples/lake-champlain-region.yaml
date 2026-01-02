@@ -168,7 +168,8 @@ layers:
     operations:
       - type: clip
     style:
-      stroke: "none"
+      stroke: "#666666"
+      stroke_width: "0.3"
       fill: "#B3E5FC"
       order: "45"
 
@@ -178,7 +179,8 @@ layers:
     operations:
       - type: clip
     style:
-      stroke: "none"
+      stroke: "#666666"
+      stroke_width: "0.3"
       fill: "#B3E5FC"
       order: "45"
 
