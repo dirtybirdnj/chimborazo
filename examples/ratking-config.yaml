@@ -1,0 +1,120 @@
+# Rat-king config for vermont-plotter-ratking.yaml
+# Maps chimborazo layer groups to patterns and colors
+#
+# At 96 DPI: 1mm ≈ 3.78 pixels
+# For 0.3mm pen, use spacing of at least 6-10 pixels (1.5-2.5mm)
+# to avoid line overlap
+
+defaults:
+  pattern: lines
+  spacing: 8.0
+  angle: 45
+  color: "#666666"
+
+groups:
+  # Vermont towns - green, concentric pattern
+  towns_vt:
+    pattern: concentric
+    color: "#2E7D32"
+    spacing: 12.0  # ~3mm spacing for concentric
+
+  # New York towns - orange, lines pattern
+  towns_ny:
+    pattern: lines
+    color: "#E65100"
+    spacing: 8.0  # ~2mm spacing
+
+  # New Hampshire towns - blue, zigzag pattern
+  towns_nh:
+    pattern: zigzag
+    color: "#1565C0"
+    spacing: 10.0
+
+  # Massachusetts towns - pink, meander pattern
+  towns_ma:
+    pattern: meander
+    color: "#AD1457"
+    spacing: 10.0
+
+  # Quebec municipalities - indigo, gosper pattern
+  quebec_muni:
+    pattern: gosper
+    color: "#3949AB"
+    spacing: 8.0
+
+  # Water layers - all use concentric in water blue
+  water_vt:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0  # ~4mm for water
+
+  water_ny:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0
+
+  water_nh:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0
+
+  water_ma:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0
+
+  water_quebec_champlain:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0
+
+  water_richelieu:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0
+
+  water_memphremagog:
+    pattern: concentric
+    color: "#0288D1"
+    spacing: 15.0
+
+  # County/state boundaries - skip fill (large spacing = essentially no fill)
+  counties_vt:
+    pattern: lines
+    spacing: 500
+    color: "#444444"
+
+  counties_ny:
+    pattern: lines
+    spacing: 500
+    color: "#444444"
+
+  counties_nh:
+    pattern: lines
+    spacing: 500
+    color: "#444444"
+
+  counties_ma:
+    pattern: lines
+    spacing: 500
+    color: "#444444"
+
+  state_vt:
+    pattern: lines
+    spacing: 500
+    color: "#333333"
+
+  state_ny:
+    pattern: lines
+    spacing: 500
+    color: "#333333"
+
+  state_nh:
+    pattern: lines
+    spacing: 500
+    color: "#333333"
+
+  state_ma:
+    pattern: lines
+    spacing: 500
+    color: "#333333"

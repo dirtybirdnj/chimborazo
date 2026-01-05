@@ -14,12 +14,13 @@ import (
 
 // SVGWriter generates SVG output from geographic features.
 type SVGWriter struct {
-	Width      float64   // page width in inches
-	Height     float64   // page height in inches
-	Margin     float64   // margin in inches
-	Bounds     orb.Bound // geographic bounds to render
-	DPI        float64   // dots per inch (default 96)
-	ShowRulers bool      // draw inch rulers on left and top edges
+	Width        float64   // page width in inches
+	Height       float64   // page height in inches
+	Margin       float64   // margin in inches
+	Bounds       orb.Bound // geographic bounds to render
+	DPI          float64   // dots per inch (default 96)
+	ShowRulers   bool      // draw inch rulers on left and top edges
+	NoBackground bool      // skip white background rect (for plotter/rat-king output)
 }
 
 // Style defines the visual appearance of a feature.
@@ -429,9 +430,11 @@ func (w *SVGWriter) Render(layers []Layer) string {
      viewBox="0 0 %.2f %.2f">
 `, widthPx, heightPx, widthPx, heightPx))
 
-	// Background (optional)
-	sb.WriteString(fmt.Sprintf(`  <rect width="%.2f" height="%.2f" fill="white"/>
+	// Background (optional - skip for plotter output)
+	if !w.NoBackground {
+		sb.WriteString(fmt.Sprintf(`  <rect width="%.2f" height="%.2f" fill="white"/>
 `, widthPx, heightPx))
+	}
 
 	// Render each layer in a group
 	for _, layer := range layers {

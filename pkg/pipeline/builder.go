@@ -163,6 +163,10 @@ func (b *Builder) Build() (*BuildResult, error) {
 		bounds,
 	)
 	writer.ShowRulers = b.Recipe.Output.Rulers
+	// For plotter quality, skip background rect (for rat-king post-processing)
+	if b.Recipe.Output.Quality == "plotter" {
+		writer.NoBackground = true
+	}
 
 	// Step 6: Write to file(s)
 	if b.Recipe.Output.PerLayer {

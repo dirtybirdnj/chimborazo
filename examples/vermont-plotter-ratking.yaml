@@ -80,16 +80,16 @@ layers:
           min_size: 3
           emit_as: water_vt
           emit_style:
-            stroke: "none"
-            fill: "#B3E5FC"
+            stroke: "#666666"
+            stroke_width: "0.15"
+            fill: "none"  # No fill - rat-king provides pattern fills
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#E8F5E9"  # Light green for VT
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "50"
-    vary_fill: true
     # patterns: concentric, zigzag, honeycomb, meander, spiral, truchet
 
   - name: towns_ny
@@ -102,16 +102,16 @@ layers:
           min_size: 3
           emit_as: water_ny
           emit_style:
-            stroke: "none"
-            fill: "#B3E5FC"
+            stroke: "#666666"
+            stroke_width: "0.15"
+            fill: "none"  # No fill - rat-king provides pattern fills
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#FFF3E0"  # Light orange for NY
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "50"
-    vary_fill: true
     # patterns: lines, brick, wiggle, hilbert, crosshatch, gosper
 
   - name: towns_nh
@@ -124,16 +124,16 @@ layers:
           min_size: 3
           emit_as: water_nh
           emit_style:
-            stroke: "none"
-            fill: "#B3E5FC"
+            stroke: "#666666"
+            stroke_width: "0.15"
+            fill: "none"  # No fill - rat-king provides pattern fills
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#E3F2FD"  # Light blue for NH
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "50"
-    vary_fill: true
     # patterns: peano, concentric, stripe, zigzag, honeycomb, spiral
 
   - name: towns_ma
@@ -146,16 +146,16 @@ layers:
           min_size: 3
           emit_as: water_ma
           emit_style:
-            stroke: "none"
-            fill: "#B3E5FC"
+            stroke: "#666666"
+            stroke_width: "0.15"
+            fill: "none"  # No fill - rat-king provides pattern fills
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#FCE4EC"  # Light pink for MA
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "50"
-    vary_fill: true
     # patterns: meander, truchet, hilbert, lines, wiggle, brick
 
   # County boundaries for each state
@@ -209,9 +209,8 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#E8EAF6"  # Light indigo for Quebec
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "50"
-    vary_fill: true
     # patterns: gosper, stripe, peano, crosshatch, concentric, zigzag
 
   # NHN water for Lake Champlain Quebec portion (Missisquoi Bay area)
@@ -226,7 +225,7 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#B3E5FC"
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "15"
     # pattern: concentric
 
@@ -241,7 +240,7 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#B3E5FC"
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "15"
     # pattern: concentric
 
@@ -256,7 +255,7 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "#B3E5FC"
+      fill: "none"  # No fill - rat-king provides pattern fills
       order: "15"
     # pattern: concentric
 
