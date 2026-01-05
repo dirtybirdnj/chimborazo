@@ -410,14 +410,22 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 		fmt.Sscanf(orderStr, "%d", &order)
 	}
 
+	// Default label property to "NAME" if labels enabled but no property specified
+	labelProp := layerDef.LabelProperty
+	if layerDef.Labels && labelProp == "" {
+		labelProp = "NAME"
+	}
+
 	return &output.Layer{
-		Name:     layerDef.Name,
-		Features: features,
-		Style:    style,
-		Order:    order,
-		FillBy:   layerDef.FillBy,
-		ColorMap: layerDef.ColorMap,
-		VaryFill: layerDef.VaryFill,
+		Name:          layerDef.Name,
+		Features:      features,
+		Style:         style,
+		Order:         order,
+		FillBy:        layerDef.FillBy,
+		ColorMap:      layerDef.ColorMap,
+		VaryFill:      layerDef.VaryFill,
+		ShowLabels:    layerDef.Labels,
+		LabelProperty: labelProp,
 	}, nil
 }
 
@@ -425,7 +433,27 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 func (b *Builder) applyOperation(op config.Operation, features geometry.FeatureCollection, bounds orb.Bound) (geometry.FeatureCollection, error) {
 	switch op.Type {
 	case "clip":
-		return geometry.ClipCollection(features, bounds), nil
+		result := geometry.ClipCollection(features, bounds)
+		// Debug: log dropped features
+		if b.Verbose && len(result) < len(features) {
+			for _, f := range features {
+				found := false
+				name := ""
+				if n, ok := f.Properties["NAME"].(string); ok {
+					name = n
+				}
+				for _, r := range result {
+					if rn, ok := r.Properties["NAME"].(string); ok && rn == name {
+						found = true
+						break
+					}
+				}
+				if !found && name != "" {
+					b.logf("    Clip dropped: %s", name)
+				}
+			}
+		}
+		return result, nil
 
 	case "simplify":
 		tolerance := 0.0001 // default
@@ -449,6 +477,22 @@ func (b *Builder) applyOperation(op config.Operation, features geometry.FeatureC
 		before := len(features)
 		result := geometry.FilterCollection(features, field, operator, value)
 		b.logf("  Filtered by %s %s %s: %d → %d features", field, operator, value, before, len(result))
+		return result, nil
+
+	case "filter_by_size":
+		// Filter features by their rendered size in mm
+		minSize := 0.0
+		if ms, ok := op.Params["min_size"].(float64); ok {
+			minSize = ms
+		} else if ms, ok := op.Params["min_size"].(int); ok {
+			minSize = float64(ms)
+		}
+		if minSize <= 0 {
+			return features, nil
+		}
+		before := len(features)
+		result := b.filterByOutputSize(features, bounds, minSize)
+		b.logf("  Filtered by size (>%.1fmm): %d → %d features", minSize, before, len(result))
 		return result, nil
 
 	case "subtract":

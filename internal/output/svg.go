@@ -32,13 +32,15 @@ type Style struct {
 
 // Layer represents a named group of features with a style.
 type Layer struct {
-	Name     string
-	Features geometry.FeatureCollection
-	Style    Style
-	Order    int
-	FillBy   string            // Property name to color by
-	ColorMap map[string]string // Property value → fill color
-	VaryFill bool              // Apply slight color variations
+	Name          string
+	Features      geometry.FeatureCollection
+	Style         Style
+	Order         int
+	FillBy        string            // Property name to color by
+	ColorMap      map[string]string // Property value → fill color
+	VaryFill      bool              // Apply slight color variations
+	ShowLabels    bool              // Show labels for features
+	LabelProperty string            // Property to use for labels (e.g., "NAME")
 }
 
 // DefaultStyle returns a reasonable default style.
@@ -250,16 +252,24 @@ func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, sty
 	for i, f := range fc {
 		// Determine fill color for this feature
 		featureStyle := style
+		colorFound := false
 		if fillBy != "" && colorMap != nil {
 			if propVal, ok := f.Properties[fillBy]; ok {
 				key := fmt.Sprintf("%v", propVal)
 				if color, exists := colorMap[key]; exists {
 					featureStyle.Fill = color
-					if varyFill {
-						// Apply slight variation based on feature index
-						featureStyle.Fill = varyColor(color, i)
-					}
+					colorFound = true
 				}
+			}
+		}
+
+		// Apply variation to the fill color (either from color map or base style)
+		if varyFill && featureStyle.Fill != "none" && featureStyle.Fill != "" {
+			if colorFound {
+				featureStyle.Fill = varyColor(featureStyle.Fill, i)
+			} else {
+				// Apply variation to base style fill
+				featureStyle.Fill = varyColor(style.Fill, i)
 			}
 		}
 
@@ -273,7 +283,7 @@ func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, sty
 	return sb.String()
 }
 
-// varyColor applies a slight variation to a hex color.
+// varyColor applies a variation to a hex color, cycling through 6 distinct shades.
 func varyColor(hexColor string, seed int) string {
 	// Parse hex color
 	if len(hexColor) != 7 || hexColor[0] != '#' {
@@ -283,11 +293,15 @@ func varyColor(hexColor string, seed int) string {
 	var r, g, b int
 	fmt.Sscanf(hexColor, "#%02x%02x%02x", &r, &g, &b)
 
-	// Apply small variation (±5%)
-	variation := (seed % 11) - 5 // -5 to +5
-	r = clamp(r + variation*2, 0, 255)
-	g = clamp(g + variation*2, 0, 255)
-	b = clamp(b + variation*2, 0, 255)
+	// Create 6 distinct shades: -3, -2, -1, 0, +1, +2 levels
+	// Each level shifts the color by ~15 RGB units for visible distinction
+	shade := seed % 6
+	offsets := []int{-3, -2, -1, 0, 1, 2}
+	variation := offsets[shade] * 15
+
+	r = clamp(r+variation, 0, 255)
+	g = clamp(g+variation, 0, 255)
+	b = clamp(b+variation, 0, 255)
 
 	return fmt.Sprintf("#%02x%02x%02x", r, g, b)
 }
@@ -301,6 +315,42 @@ func clamp(val, min, max int) int {
 		return max
 	}
 	return val
+}
+
+// calculateCentroid calculates the centroid of a geometry.
+func (w *SVGWriter) calculateCentroid(g orb.Geometry) (float64, float64) {
+	bound := g.Bound()
+	// Simple centroid: center of bounding box
+	centerLon := (bound.Min[0] + bound.Max[0]) / 2
+	centerLat := (bound.Min[1] + bound.Max[1]) / 2
+	return w.projectPoint(orb.Point{centerLon, centerLat})
+}
+
+// WriteLabels generates SVG text elements for feature labels.
+func (w *SVGWriter) WriteLabels(fc geometry.FeatureCollection, labelProperty string) string {
+	var sb strings.Builder
+	for _, f := range fc {
+		if f == nil || f.Geometry == nil {
+			continue
+		}
+
+		// Get label text from property
+		labelText := ""
+		if prop, ok := f.Properties[labelProperty]; ok {
+			labelText = fmt.Sprintf("%v", prop)
+		}
+		if labelText == "" {
+			continue
+		}
+
+		// Calculate centroid
+		x, y := w.calculateCentroid(f.Geometry)
+
+		// Write text element with small font
+		sb.WriteString(fmt.Sprintf(`    <text x="%.2f" y="%.2f" font-size="6" text-anchor="middle" fill="#333333" font-family="sans-serif">%s</text>
+`, x, y, labelText))
+	}
+	return sb.String()
 }
 
 // renderRulers generates SVG elements for inch rulers on left and top edges.
@@ -387,11 +437,15 @@ func (w *SVGWriter) Render(layers []Layer) string {
 	for _, layer := range layers {
 		sb.WriteString(fmt.Sprintf(`  <g id="%s">
 `, layer.Name))
-		// Use color mapping if fill_by is specified
-		if layer.FillBy != "" && layer.ColorMap != nil {
+		// Use color mapping if fill_by is specified, or vary_fill for variations
+		if (layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill {
 			sb.WriteString(w.WriteCollectionWithColors(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill))
 		} else {
 			sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
+		}
+		// Add labels if enabled
+		if layer.ShowLabels && layer.LabelProperty != "" {
+			sb.WriteString(w.WriteLabels(layer.Features, layer.LabelProperty))
 		}
 		sb.WriteString("  </g>\n")
 	}
@@ -432,8 +486,8 @@ func (w *SVGWriter) RenderSingleLayer(layer Layer) string {
 	// Render the single layer
 	sb.WriteString(fmt.Sprintf(`  <g id="%s">
 `, layer.Name))
-	// Use color mapping if fill_by is specified
-	if layer.FillBy != "" && layer.ColorMap != nil {
+	// Use color mapping if fill_by is specified, or vary_fill for variations
+	if (layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill {
 		sb.WriteString(w.WriteCollectionWithColors(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill))
 	} else {
 		sb.WriteString(w.WriteCollection(layer.Features, layer.Style))

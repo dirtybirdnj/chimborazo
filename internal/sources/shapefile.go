@@ -185,25 +185,66 @@ func polygonPartsToOrb(numParts int32, parts []int32, points []shp.Point) orb.Ge
 		rings[i] = ring
 	}
 
-	// In shapefiles, the first ring is the exterior, subsequent rings are holes.
-	// However, multiple exterior rings indicate a MultiPolygon.
-	// We detect this by checking ring orientation (CCW = exterior, CW = hole in shapefile spec).
-
-	// For simplicity, if there's only one ring, return a simple Polygon.
-	// If there are multiple rings, assume first is exterior and rest are holes.
-	// TODO: Proper multi-polygon detection based on ring orientation.
+	// In shapefiles:
+	// - Counter-clockwise (CCW) rings are exterior boundaries
+	// - Clockwise (CW) rings are holes
+	// Multiple CCW rings = MultiPolygon
 
 	if len(rings) == 1 {
 		return orb.Polygon{rings[0]}
 	}
 
-	// Assume single polygon with holes
-	// First ring is exterior, rest are holes
-	poly := make(orb.Polygon, len(rings))
-	for i, ring := range rings {
-		poly[i] = ring
+	// Group rings into polygons based on orientation
+	// CCW = exterior (starts new polygon), CW = hole (belongs to previous exterior)
+	var polygons []orb.Polygon
+	var currentPoly orb.Polygon
+
+	for _, ring := range rings {
+		if isExteriorRing(ring) {
+			// Exterior ring - start a new polygon
+			if len(currentPoly) > 0 {
+				polygons = append(polygons, currentPoly)
+			}
+			currentPoly = orb.Polygon{ring}
+		} else {
+			// Hole - add to current polygon
+			if len(currentPoly) > 0 {
+				currentPoly = append(currentPoly, ring)
+			}
+		}
 	}
-	return poly
+
+	// Don't forget the last polygon
+	if len(currentPoly) > 0 {
+		polygons = append(polygons, currentPoly)
+	}
+
+	if len(polygons) == 1 {
+		return polygons[0]
+	}
+
+	return orb.MultiPolygon(polygons)
+}
+
+// isExteriorRing returns true if the ring is an exterior ring (clockwise in ESRI shapefiles).
+// Uses the shoelace formula to calculate signed area.
+// In ESRI shapefiles: clockwise = exterior, counter-clockwise = hole
+func isExteriorRing(ring orb.Ring) bool {
+	if len(ring) < 3 {
+		return true
+	}
+
+	// Calculate signed area using shoelace formula
+	var sum float64
+	for i := 0; i < len(ring)-1; i++ {
+		sum += (ring[i+1][0] - ring[i][0]) * (ring[i+1][1] + ring[i][1])
+	}
+	// Close the ring
+	sum += (ring[0][0] - ring[len(ring)-1][0]) * (ring[0][1] + ring[len(ring)-1][1])
+
+	// Positive sum = clockwise = exterior in ESRI shapefiles
+	// Negative sum = counter-clockwise = hole
+	return sum > 0
 }
 
 // ReadShapefileFiltered reads a shapefile and filters features by state FIPS.

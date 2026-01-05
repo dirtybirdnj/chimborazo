@@ -76,14 +76,16 @@ type BoundsConfig struct {
 
 // Layer defines a single map layer
 type Layer struct {
-	Name       string            `yaml:"name"`
-	Source     string            `yaml:"source"`
-	Operations []Operation       `yaml:"operations,omitempty"`
-	Style      map[string]string `yaml:"style,omitempty"`
-	FillBy     string            `yaml:"fill_by,omitempty"`     // Property to color by
-	ColorMap   map[string]string `yaml:"color_map,omitempty"`   // Property value → color
-	VaryFill   bool              `yaml:"vary_fill,omitempty"`   // Slight color variations
-	Filter     string            `yaml:"filter,omitempty"`
+	Name          string            `yaml:"name"`
+	Source        string            `yaml:"source"`
+	Operations    []Operation       `yaml:"operations,omitempty"`
+	Style         map[string]string `yaml:"style,omitempty"`
+	FillBy        string            `yaml:"fill_by,omitempty"`       // Property to color by
+	ColorMap      map[string]string `yaml:"color_map,omitempty"`     // Property value → color
+	VaryFill      bool              `yaml:"vary_fill,omitempty"`     // Slight color variations
+	Filter        string            `yaml:"filter,omitempty"`
+	Labels        bool              `yaml:"labels,omitempty"`        // Show labels for features
+	LabelProperty string            `yaml:"label_property,omitempty"` // Property to use for labels (default: "NAME")
 }
 
 // Operation defines a geometry operation

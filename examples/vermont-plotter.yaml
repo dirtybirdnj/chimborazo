@@ -1,49 +1,249 @@
-# Vermont Plotter-Ready Map
-# Outputs each layer as a separate SVG for multi-pen plotting
+# Vermont Plotter Map
+# Version with color variations for pen plotter (0.8mm ball pens, 0.3-0.4mm lines)
+# 6 shade variations per state/province
 #
 # Run with: chimborazo build examples/vermont-plotter.yaml
-#
-# Outputs:
-#   output/vermont-plotter.svg (combined)
-#   output/vermont-plotter_state_boundary.svg
-#   output/vermont-plotter_counties.svg
 
-name: Vermont Plotter Map
+name: Vermont Plotter
 
 output:
   path: output/vermont-plotter.svg
   width: 12
   height: 18
   units: inches
-  per_layer: true
-  margin: 0.5
+  quality: plotter
+  min_feature_size: 0
+  rulers: true
 
 bounds:
-  source: census://state/VT
-  padding: 0.05
+  # Centered on Vermont
+  # [West, South, East, North]
+  explicit: [-73.65, 42.45, -71.45, 45.45]
+  padding: 0.02
 
 layers:
-  # State boundary - black pen, thick
-  - name: state_boundary
+  # Towns/cousubs for each state - emit water layers via subtract operation
+  # This ensures water display matches cutouts exactly (no offset issues)
+
+  - name: towns_vt
+    source: census://cousub/VT
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3
+          emit_as: water_vt
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#E8F5E9"  # Light green for VT
+      order: "50"
+    vary_fill: true
+
+  - name: towns_ny
+    source: census://cousub/NY
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NY
+          by_county: true
+          min_size: 3
+          emit_as: water_ny
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#FFF3E0"  # Light orange for NY
+      order: "50"
+    vary_fill: true
+
+  - name: towns_nh
+    source: census://cousub/NH
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NH
+          by_county: true
+          min_size: 3
+          emit_as: water_nh
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#E3F2FD"  # Light blue for NH
+      order: "50"
+    vary_fill: true
+
+  - name: towns_ma
+    source: census://cousub/MA
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/MA
+          by_county: true
+          min_size: 3
+          emit_as: water_ma
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#FCE4EC"  # Light pink for MA
+      order: "50"
+    vary_fill: true
+
+  # County boundaries for each state
+  - name: counties_vt
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ny
+    source: census://county/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_nh
+    source: census://county/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ma
+    source: census://county/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  # Quebec municipalities (Canadian data)
+  # Note: No water subtraction - algorithm can't handle 533 municipalities at once
+  # Water is overlaid on top via NHN layers
+  - name: quebec_muni
+    source: quebec://municipalities
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#E8EAF6"  # Light indigo for Quebec
+      order: "50"
+    vary_fill: true
+
+  # NHN water for Lake Champlain Quebec portion (Missisquoi Bay area)
+  # Rendered on top of Quebec municipalities (order < 50 = renders later = on top)
+  - name: water_quebec_champlain
+    source: canada://nhn/02OHB00
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#B3E5FC"
+      order: "15"
+
+  # NHN water for Richelieu River corridor
+  - name: water_richelieu
+    source: canada://nhn/02OJ000
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#B3E5FC"
+      order: "15"
+
+  # NHN water for Lake Memphremagog area (St-François River basin)
+  - name: water_memphremagog
+    source: canada://nhn/02OE000
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#B3E5FC"
+      order: "15"
+
+  # State/Province boundaries (rendered on top)
+  - name: state_vt
     source: census://state/VT
     operations:
       - type: clip
     style:
-      stroke: "#000000"
-      stroke_width: "2.0"
+      stroke: "#333333"
+      stroke_width: "0.8"
       fill: "none"
-      order: "100"
+      order: "90"
 
-  # County boundaries - blue pen, medium
-  - name: counties
-    source: census://county/VT
+  - name: state_ny
+    source: census://state/NY
     operations:
       - type: clip
-      - type: simplify
-        params:
-          tolerance: 0.0001
     style:
-      stroke: "#0066CC"
-      stroke_width: "1.0"
+      stroke: "#333333"
+      stroke_width: "0.8"
       fill: "none"
-      order: "50"
+      order: "90"
+
+  - name: state_nh
+    source: census://state/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ma
+    source: census://state/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"

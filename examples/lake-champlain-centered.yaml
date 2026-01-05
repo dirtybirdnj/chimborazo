@@ -1,26 +1,25 @@
-# Lake Champlain Region - Multi-State/Province Map
-# Includes: Vermont, New York, New Hampshire, Massachusetts, Quebec
+# Lake Champlain Centered Map
+# Tight focus on Lake Champlain with surrounding towns (VT, NY, Quebec)
 #
 # Uses emit_as for unified water layers - ensures water display matches cutouts exactly
 #
-# Run with: chimborazo build examples/lake-champlain-region.yaml
+# Run with: chimborazo build examples/lake-champlain-centered.yaml
 
-name: Lake Champlain Region with Quebec
+name: Lake Champlain Centered
 
 output:
-  path: output/lake-champlain-region.svg
-  width: 18
-  height: 24
+  path: output/lake-champlain-centered.svg
+  width: 12
+  height: 18
   units: inches
   quality: high
   min_feature_size: 0
   rulers: true
 
 bounds:
-  # Centered on Lake Champlain
-  # Lake extends from ~43.0°N (Crown Point) to ~45.1°N (Missisquoi Bay)
+  # Centered on Lake Champlain itself
   # [West, South, East, North]
-  explicit: [-74.0, 43.0, -71.8, 45.5]
+  explicit: [-74.0, 43.4, -72.5, 45.6]
   padding: 0.02
 
 layers:
