@@ -1,95 +1,115 @@
-# Chimborazo Session - Dec 27, 2024
+# Chimborazo Session - Jan 5, 2025
 
 ## Current State
-Working on Vermont towns + hydro map with water subtraction.
+Working on plotter-ready Vermont maps with color variations for pen plotting.
 
-## The Problem We're Stuck On
-Small lakes are not appearing on the map despite adjusting filter thresholds from 3mm to 7mm. We've swung between two extremes:
-1. **Too many features**: Thousands of tiny black specks (holes in towns from subtracted water)
-2. **Too few features**: No small lakes visible at all
+## What Was Fixed This Session
 
-### Root Cause (suspected)
-There are TWO separate filters that need to work together:
-1. `min_feature_size` in output config - filters the **water display layer** (blue water shown)
-2. `min_size` in subtract operation params - filters what gets **subtracted from towns**
+### 1. Missing Towns (Ryegate VT)
+**Problem**: Ryegate appeared as a 2x1 pixel rectangle instead of the full town polygon.
 
-The water layer at 3mm shows only ~7 features (big lakes like Champlain, Memphremagog).
-The subtract at 3mm processes ~300+ water features per county.
+**Root Cause**: Census TIGER data stores Ryegate as a MULTIPOLYGON with two disjoint exterior rings (a tiny fragment + the main town). The shapefile reader was treating all rings after the first as holes.
 
-**Mismatch**: Many lakes get cut OUT of towns but aren't DISPLAYED as blue because the water layer filter is too aggressive.
+**Fix**: Implemented ring orientation detection using the shoelace formula in `internal/sources/shapefile.go`:
+- ESRI shapefiles: clockwise rings = exterior, counter-clockwise = holes
+- Added `isExteriorRing()` function to detect orientation
+- Modified `polygonPartsToOrb()` to group rings correctly into MultiPolygons
 
-### What was tried
-- min_feature_size: 4mm, 5mm, 6mm, 7mm
-- min_size on subtract: 3mm, 5mm, 6mm, 7mm
-- Both set to same value (3mm currently)
+### 2. vary_fill Not Working
+**Problem**: Setting `vary_fill: true` in recipes had no effect - all features used the same color.
 
-## Key Files
+**Root Cause**: `WriteCollectionWithColors()` was only called when `FillBy` and `ColorMap` were set. Without those, it fell back to `WriteCollection()` which ignored `VaryFill`.
 
-### Recipe: `examples/vermont-towns-hydro.yaml`
-```yaml
-output:
-  min_feature_size: 3  # Filter water features smaller than 3mm
+**Fix**:
+- Changed render condition to `(layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill`
+- Modified `WriteCollectionWithColors()` to apply variation to base style fill when no color map exists
+- Improved `varyColor()` to produce 6 distinct shades with ±45 RGB variation
 
-layers:
-  - name: water
-    source: census://areawater/VT
-    # This layer gets filtered by min_feature_size
+### 3. Stroke Width Consistency
+**Problem**: Quebec water boundaries appeared thicker than VT water edges. MRC boundaries cluttered the map.
 
-  - name: towns
-    operations:
-      - type: subtract
-        params:
-          source: census://areawater/VT
-          by_county: true
-          min_size: 3  # Separate filter for subtraction
+**Fix**:
+- Standardized all town/county/municipality strokes to 0.15mm
+- Removed Quebec MRC layer entirely
+- State/province boundaries remain at 0.8mm
+- Quebec NHN water layers now match US water edge appearance
+
+## New Map Variants Created
+
+| Recipe | Focus | Paper | Notes |
+|--------|-------|-------|-------|
+| `vermont-centered.yaml` | Vermont state | 12x18" | Bounds: [-73.65, 42.45, -71.45, 45.45] |
+| `lake-champlain-centered.yaml` | Lake Champlain | 12x18" | Bounds: [-74.0, 43.4, -72.5, 45.6] |
+| `vermont-plotter.yaml` | Vermont (plotter) | 12x18" | Has `vary_fill: true` on all subdivisions |
+
+## Key Code Changes
+
+### `internal/sources/shapefile.go`
+```go
+// isExteriorRing returns true if clockwise (ESRI convention)
+func isExteriorRing(ring orb.Ring) bool {
+    var sum float64
+    for i := 0; i < len(ring)-1; i++ {
+        sum += (ring[i+1][0] - ring[i][0]) * (ring[i+1][1] + ring[i][1])
+    }
+    return sum > 0
+}
 ```
 
-### Code changes made this session
+### `internal/output/svg.go`
+- Added `ShowLabels` and `LabelProperty` to Layer struct
+- Added `WriteLabels()` and `calculateCentroid()` for debugging
+- Fixed `varyColor()` to cycle through 6 distinct shades:
+```go
+shade := seed % 6
+offsets := []int{-3, -2, -1, 0, 1, 2}
+variation := offsets[shade] * 15  // ±45 RGB max
+```
 
-1. **`pkg/pipeline/builder.go`**:
-   - Added `min_size` parameter to subtract operation
-   - Modified `subtractByCounty()` to accept bounds and minSizeMM parameters
-   - Filters water features BEFORE subtracting them from towns
+### `internal/config/recipe.go`
+- Added `Labels` and `LabelProperty` fields to layer config
 
-2. **`internal/output/svg.go`**:
-   - Changed stroke_width interpretation from pixels to mm
-   - Added `mmToPixels()` helper function
-   - Rulers now use 0.3mm line width
-
-3. **`internal/config/recipe.go`**:
-   - Already had min_feature_size and rulers options
-
-## Recipe Settings (current)
-- Output: 12x18 inches
-- min_feature_size: 3mm
-- subtract min_size: 3mm
-- County stroke: 0.5mm
-- Town stroke: 0.3mm
-- State boundary: REMOVED (was too thick at 2.0mm)
-
-## Things That Work
-- County-by-county water subtraction (avoids polygon queue limits)
-- Stroke width in mm (converts to pixels at render time)
-- Rulers on left and top edges
-- Color mapping by county FIPS code
-
-## Next Steps to Try
-1. **Debug the water layer**: Check why only ~7 features pass the 3mm filter when statewide there should be hundreds of lakes >= 3mm
-2. **Check the merged water data**: The statewide water layer loads merged data - maybe the merge or cache is stale
-3. **Compare per-county vs statewide counts**: The subtract sees ~300+ features per county at 3mm but the display layer only sees ~7 total?
-4. **Try removing min_feature_size entirely** from output config - let ALL water display as blue, only filter the subtraction
+## Recipe Settings (plotter version)
+- Output: 12x18 inches, quality: plotter
+- All town strokes: 0.15mm (for 0.3-0.4mm pen lines)
+- State boundaries: 0.8mm
+- `vary_fill: true` on: towns_vt, towns_ny, towns_nh, towns_ma, quebec_muni
+- Water: #B3E5FC with stroke "none" (filled from emit_as)
 
 ## Pending Tasks
-- Create full Lake Champlain map with NY
-- Add river/linearwater layer
+- Add fill patterns to water bodies (user selecting from rat-king)
+- User has 0.8mm ball pens that leave 0.3-0.4mm lines
 
-## Commands to rebuild
+## Commands
 ```bash
-go build -o chimborazo ./cmd/chimborazo
-./chimborazo build --verbose examples/vermont-towns-hydro.yaml
-open output/vermont-towns-hydro.svg
+# Build and view plotter version
+./chimborazo build examples/vermont-plotter.yaml
+open -a Gapplin output/vermont-plotter.svg
 
-# Generate PNG for analysis
-qlmanage -t -s 2000 -o /tmp output/vermont-towns-hydro.svg
-open /tmp/vermont-towns-hydro.svg.png
+# Other variants
+./chimborazo build examples/vermont-centered.yaml
+./chimborazo build examples/lake-champlain-centered.yaml
 ```
+
+## Architecture Notes
+
+### SVG Layer Order
+- Higher `order` = rendered first = appears at bottom
+- Water layers: order 10-15 (on top of everything)
+- Town fills: order 50
+- County boundaries: order 80
+- State boundaries: order 90
+
+### emit_as Pattern
+Water subtraction emits the subtracted geometry as a separate layer:
+```yaml
+- type: subtract
+  params:
+    source: census://areawater/VT
+    emit_as: water_vt
+    emit_style:
+      stroke: "none"
+      fill: "#B3E5FC"
+    emit_order: 10
+```
+This ensures water display matches cutouts exactly (no offset issues).
