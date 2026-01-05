@@ -83,6 +83,7 @@ type Layer struct {
 	FillBy        string            `yaml:"fill_by,omitempty"`       // Property to color by
 	ColorMap      map[string]string `yaml:"color_map,omitempty"`     // Property value → color
 	VaryFill      bool              `yaml:"vary_fill,omitempty"`     // Slight color variations
+	Patterns      []string          `yaml:"patterns,omitempty"`      // Pattern names to cycle through (for rat-king)
 	Filter        string            `yaml:"filter,omitempty"`
 	Labels        bool              `yaml:"labels,omitempty"`        // Show labels for features
 	LabelProperty string            `yaml:"label_property,omitempty"` // Property to use for labels (default: "NAME")

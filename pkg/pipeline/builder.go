@@ -428,6 +428,7 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 		FillBy:        layerDef.FillBy,
 		ColorMap:      layerDef.ColorMap,
 		VaryFill:      layerDef.VaryFill,
+		Patterns:      layerDef.Patterns,
 		ShowLabels:    layerDef.Labels,
 		LabelProperty: labelProp,
 	}, nil

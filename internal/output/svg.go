@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/paulmach/orb"
@@ -40,6 +41,7 @@ type Layer struct {
 	FillBy        string            // Property name to color by
 	ColorMap      map[string]string // Property value → fill color
 	VaryFill      bool              // Apply slight color variations
+	Patterns      []string          // Pattern names to cycle through (for rat-king data attributes)
 	ShowLabels    bool              // Show labels for features
 	LabelProperty string            // Property to use for labels (e.g., "NAME")
 }
@@ -205,6 +207,11 @@ func (w *SVGWriter) geometryToPath(g orb.Geometry) string {
 
 // WriteFeature converts a Feature to SVG element(s).
 func (w *SVGWriter) WriteFeature(f *geometry.Feature, style Style) string {
+	return w.WriteFeatureWithAttrs(f, style, nil)
+}
+
+// WriteFeatureWithAttrs converts a Feature to SVG element(s) with optional data attributes.
+func (w *SVGWriter) WriteFeatureWithAttrs(f *geometry.Feature, style Style, dataAttrs map[string]string) string {
 	if f == nil || f.Geometry == nil {
 		return ""
 	}
@@ -229,8 +236,21 @@ func (w *SVGWriter) WriteFeature(f *geometry.Feature, style Style) string {
 	}
 
 	strokeWidthPx := w.mmToPixels(style.StrokeWidth)
-	return fmt.Sprintf(`<path d="%s" stroke="%s" stroke-width="%.2f" fill="%s" opacity="%.2f" fill-rule="evenodd"/>`,
-		pathData, style.Stroke, strokeWidthPx, style.Fill, style.Opacity)
+
+	// Build data attributes string
+	var attrStr string
+	if len(dataAttrs) > 0 {
+		var attrs []string
+		for k, v := range dataAttrs {
+			attrs = append(attrs, fmt.Sprintf(`data-%s="%s"`, k, v))
+		}
+		// Sort for consistent output
+		sort.Strings(attrs)
+		attrStr = " " + strings.Join(attrs, " ")
+	}
+
+	return fmt.Sprintf(`<path d="%s" stroke="%s" stroke-width="%.2f" fill="%s" opacity="%.2f" fill-rule="evenodd"%s/>`,
+		pathData, style.Stroke, strokeWidthPx, style.Fill, style.Opacity, attrStr)
 }
 
 // WriteCollection converts a FeatureCollection to SVG elements.
@@ -249,6 +269,11 @@ func (w *SVGWriter) WriteCollection(fc geometry.FeatureCollection, style Style) 
 
 // WriteCollectionWithColors converts a FeatureCollection with per-feature coloring.
 func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, style Style, fillBy string, colorMap map[string]string, varyFill bool) string {
+	return w.WriteCollectionWithColorsAndPatterns(fc, style, fillBy, colorMap, varyFill, nil)
+}
+
+// WriteCollectionWithColorsAndPatterns converts a FeatureCollection with per-feature coloring and pattern attributes.
+func (w *SVGWriter) WriteCollectionWithColorsAndPatterns(fc geometry.FeatureCollection, style Style, fillBy string, colorMap map[string]string, varyFill bool, patterns []string) string {
 	var sb strings.Builder
 	for i, f := range fc {
 		// Determine fill color for this feature
@@ -264,6 +289,9 @@ func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, sty
 			}
 		}
 
+		// Calculate shade index (0-5) for this feature
+		shade := i % 6
+
 		// Apply variation to the fill color (either from color map or base style)
 		if varyFill && featureStyle.Fill != "none" && featureStyle.Fill != "" {
 			if colorFound {
@@ -274,7 +302,17 @@ func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, sty
 			}
 		}
 
-		element := w.WriteFeature(f, featureStyle)
+		// Build data attributes for rat-king
+		var dataAttrs map[string]string
+		if len(patterns) > 0 {
+			pattern := patterns[i%len(patterns)]
+			dataAttrs = map[string]string{
+				"pattern": pattern,
+				"shade":   fmt.Sprintf("%d", shade),
+			}
+		}
+
+		element := w.WriteFeatureWithAttrs(f, featureStyle, dataAttrs)
 		if element != "" {
 			sb.WriteString("    ")
 			sb.WriteString(element)
@@ -440,9 +478,9 @@ func (w *SVGWriter) Render(layers []Layer) string {
 	for _, layer := range layers {
 		sb.WriteString(fmt.Sprintf(`  <g id="%s">
 `, layer.Name))
-		// Use color mapping if fill_by is specified, or vary_fill for variations
-		if (layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill {
-			sb.WriteString(w.WriteCollectionWithColors(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill))
+		// Use color mapping if fill_by is specified, vary_fill for variations, or patterns for rat-king
+		if (layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill || len(layer.Patterns) > 0 {
+			sb.WriteString(w.WriteCollectionWithColorsAndPatterns(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill, layer.Patterns))
 		} else {
 			sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
 		}
@@ -489,9 +527,9 @@ func (w *SVGWriter) RenderSingleLayer(layer Layer) string {
 	// Render the single layer
 	sb.WriteString(fmt.Sprintf(`  <g id="%s">
 `, layer.Name))
-	// Use color mapping if fill_by is specified, or vary_fill for variations
-	if (layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill {
-		sb.WriteString(w.WriteCollectionWithColors(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill))
+	// Use color mapping if fill_by is specified, vary_fill for variations, or patterns for rat-king
+	if (layer.FillBy != "" && layer.ColorMap != nil) || layer.VaryFill || len(layer.Patterns) > 0 {
+		sb.WriteString(w.WriteCollectionWithColorsAndPatterns(layer.Features, layer.Style, layer.FillBy, layer.ColorMap, layer.VaryFill, layer.Patterns))
 	} else {
 		sb.WriteString(w.WriteCollection(layer.Features, layer.Style))
 	}

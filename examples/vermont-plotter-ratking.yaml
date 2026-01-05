@@ -1,11 +1,12 @@
 # Vermont Plotter Map - Rat King Edition
 # Version with 5-star rated patterns from rat-king for pen plotter
-# Each region has 6 randomly-selected patterns (one per shade)
+# Each region has 6 patterns (one per shade 0-5), embedded as data-pattern attributes
 #
 # 5-star patterns: lines, crosshatch, zigzag, wiggle, spiral, concentric,
 #                  honeycomb, brick, truchet, stripe, gosper, hilbert, peano, meander
 #
 # Run with: chimborazo build examples/vermont-plotter-ratking.yaml
+# Then:     rat-king fill output/vermont-plotter-ratking.svg -o output/vermont-plotter-ratking-filled.svg
 
 name: Vermont Plotter Ratking
 
@@ -24,54 +25,19 @@ bounds:
   explicit: [-73.65, 42.45, -71.45, 45.45]
   padding: 0.02
 
-# Pattern assignments for rat-king fill generation
-# Each region gets 6 patterns (one per shade index 0-5)
-# Randomly selected from 5-star rated patterns
-patterns:
-  vt:
-    - concentric   # shade 0
-    - zigzag       # shade 1
-    - honeycomb    # shade 2
-    - meander      # shade 3
-    - spiral       # shade 4
-    - truchet      # shade 5
-  ny:
-    - lines        # shade 0
-    - brick        # shade 1
-    - wiggle       # shade 2
-    - hilbert      # shade 3
-    - crosshatch   # shade 4
-    - gosper       # shade 5
-  nh:
-    - peano        # shade 0
-    - concentric   # shade 1
-    - stripe       # shade 2
-    - zigzag       # shade 3
-    - honeycomb    # shade 4
-    - spiral       # shade 5
-  ma:
-    - meander      # shade 0
-    - truchet      # shade 1
-    - hilbert      # shade 2
-    - lines        # shade 3
-    - wiggle       # shade 4
-    - brick        # shade 5
-  qc:
-    - gosper       # shade 0
-    - stripe       # shade 1
-    - peano        # shade 2
-    - crosshatch   # shade 3
-    - concentric   # shade 4
-    - zigzag       # shade 5
-  water:
-    - concentric   # all water bodies
-
 layers:
   # Towns/cousubs for each state - emit water layers via subtract operation
   # This ensures water display matches cutouts exactly (no offset issues)
 
   - name: towns_vt
     source: census://cousub/VT
+    patterns:
+      - concentric   # shade 0
+      - zigzag       # shade 1
+      - honeycomb    # shade 2
+      - meander      # shade 3
+      - spiral       # shade 4
+      - truchet      # shade 5
     operations:
       - type: subtract
         params:
@@ -82,18 +48,24 @@ layers:
           emit_style:
             stroke: "#666666"
             stroke_width: "0.15"
-            fill: "none"  # No fill - rat-king provides pattern fills
+            fill: "none"
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "50"
-    # patterns: concentric, zigzag, honeycomb, meander, spiral, truchet
 
   - name: towns_ny
     source: census://cousub/NY
+    patterns:
+      - lines        # shade 0
+      - brick        # shade 1
+      - wiggle       # shade 2
+      - hilbert      # shade 3
+      - crosshatch   # shade 4
+      - gosper       # shade 5
     operations:
       - type: subtract
         params:
@@ -104,18 +76,24 @@ layers:
           emit_style:
             stroke: "#666666"
             stroke_width: "0.15"
-            fill: "none"  # No fill - rat-king provides pattern fills
+            fill: "none"
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "50"
-    # patterns: lines, brick, wiggle, hilbert, crosshatch, gosper
 
   - name: towns_nh
     source: census://cousub/NH
+    patterns:
+      - peano        # shade 0
+      - concentric   # shade 1
+      - stripe       # shade 2
+      - zigzag       # shade 3
+      - honeycomb    # shade 4
+      - spiral       # shade 5
     operations:
       - type: subtract
         params:
@@ -126,18 +104,24 @@ layers:
           emit_style:
             stroke: "#666666"
             stroke_width: "0.15"
-            fill: "none"  # No fill - rat-king provides pattern fills
+            fill: "none"
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "50"
-    # patterns: peano, concentric, stripe, zigzag, honeycomb, spiral
 
   - name: towns_ma
     source: census://cousub/MA
+    patterns:
+      - meander      # shade 0
+      - truchet      # shade 1
+      - hilbert      # shade 2
+      - lines        # shade 3
+      - wiggle       # shade 4
+      - brick        # shade 5
     operations:
       - type: subtract
         params:
@@ -148,17 +132,16 @@ layers:
           emit_style:
             stroke: "#666666"
             stroke_width: "0.15"
-            fill: "none"  # No fill - rat-king provides pattern fills
+            fill: "none"
           emit_order: 10
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "50"
-    # patterns: meander, truchet, hilbert, lines, wiggle, brick
 
-  # County boundaries for each state
+  # County boundaries for each state (no patterns - just outlines)
   - name: counties_vt
     source: census://county/VT
     operations:
@@ -200,23 +183,28 @@ layers:
       order: "80"
 
   # Quebec municipalities (Canadian data)
-  # Note: No water subtraction - algorithm can't handle 533 municipalities at once
-  # Water is overlaid on top via NHN layers
   - name: quebec_muni
     source: quebec://municipalities
+    patterns:
+      - gosper       # shade 0
+      - stripe       # shade 1
+      - peano        # shade 2
+      - crosshatch   # shade 3
+      - concentric   # shade 4
+      - zigzag       # shade 5
     operations:
       - type: clip
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "50"
-    # patterns: gosper, stripe, peano, crosshatch, concentric, zigzag
 
-  # NHN water for Lake Champlain Quebec portion (Missisquoi Bay area)
-  # Rendered on top of Quebec municipalities (order < 50 = renders later = on top)
+  # NHN water for Lake Champlain Quebec portion (all use concentric)
   - name: water_quebec_champlain
     source: canada://nhn/02OHB00
+    patterns:
+      - concentric
     operations:
       - type: filter_by_size
         params:
@@ -225,13 +213,14 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "15"
-    # pattern: concentric
 
   # NHN water for Richelieu River corridor
   - name: water_richelieu
     source: canada://nhn/02OJ000
+    patterns:
+      - concentric
     operations:
       - type: filter_by_size
         params:
@@ -240,13 +229,14 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "15"
-    # pattern: concentric
 
-  # NHN water for Lake Memphremagog area (St-François River basin)
+  # NHN water for Lake Memphremagog area
   - name: water_memphremagog
     source: canada://nhn/02OE000
+    patterns:
+      - concentric
     operations:
       - type: filter_by_size
         params:
@@ -255,11 +245,10 @@ layers:
     style:
       stroke: "#666666"
       stroke_width: "0.15"
-      fill: "none"  # No fill - rat-king provides pattern fills
+      fill: "none"
       order: "15"
-    # pattern: concentric
 
-  # State/Province boundaries (rendered on top)
+  # State/Province boundaries (no patterns - just outlines)
   - name: state_vt
     source: census://state/VT
     operations:
