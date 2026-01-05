@@ -1,0 +1,302 @@
+# Vermont Plotter Map - Rat King Edition
+# Version with 5-star rated patterns from rat-king for pen plotter
+# Each region has 6 randomly-selected patterns (one per shade)
+#
+# 5-star patterns: lines, crosshatch, zigzag, wiggle, spiral, concentric,
+#                  honeycomb, brick, truchet, stripe, gosper, hilbert, peano, meander
+#
+# Run with: chimborazo build examples/vermont-plotter-ratking.yaml
+
+name: Vermont Plotter Ratking
+
+output:
+  path: output/vermont-plotter-ratking.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: plotter
+  min_feature_size: 0
+  rulers: true
+
+bounds:
+  # Centered on Vermont
+  # [West, South, East, North]
+  explicit: [-73.65, 42.45, -71.45, 45.45]
+  padding: 0.02
+
+# Pattern assignments for rat-king fill generation
+# Each region gets 6 patterns (one per shade index 0-5)
+# Randomly selected from 5-star rated patterns
+patterns:
+  vt:
+    - concentric   # shade 0
+    - zigzag       # shade 1
+    - honeycomb    # shade 2
+    - meander      # shade 3
+    - spiral       # shade 4
+    - truchet      # shade 5
+  ny:
+    - lines        # shade 0
+    - brick        # shade 1
+    - wiggle       # shade 2
+    - hilbert      # shade 3
+    - crosshatch   # shade 4
+    - gosper       # shade 5
+  nh:
+    - peano        # shade 0
+    - concentric   # shade 1
+    - stripe       # shade 2
+    - zigzag       # shade 3
+    - honeycomb    # shade 4
+    - spiral       # shade 5
+  ma:
+    - meander      # shade 0
+    - truchet      # shade 1
+    - hilbert      # shade 2
+    - lines        # shade 3
+    - wiggle       # shade 4
+    - brick        # shade 5
+  qc:
+    - gosper       # shade 0
+    - stripe       # shade 1
+    - peano        # shade 2
+    - crosshatch   # shade 3
+    - concentric   # shade 4
+    - zigzag       # shade 5
+  water:
+    - concentric   # all water bodies
+
+layers:
+  # Towns/cousubs for each state - emit water layers via subtract operation
+  # This ensures water display matches cutouts exactly (no offset issues)
+
+  - name: towns_vt
+    source: census://cousub/VT
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3
+          emit_as: water_vt
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#E8F5E9"  # Light green for VT
+      order: "50"
+    vary_fill: true
+    # patterns: concentric, zigzag, honeycomb, meander, spiral, truchet
+
+  - name: towns_ny
+    source: census://cousub/NY
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NY
+          by_county: true
+          min_size: 3
+          emit_as: water_ny
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#FFF3E0"  # Light orange for NY
+      order: "50"
+    vary_fill: true
+    # patterns: lines, brick, wiggle, hilbert, crosshatch, gosper
+
+  - name: towns_nh
+    source: census://cousub/NH
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NH
+          by_county: true
+          min_size: 3
+          emit_as: water_nh
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#E3F2FD"  # Light blue for NH
+      order: "50"
+    vary_fill: true
+    # patterns: peano, concentric, stripe, zigzag, honeycomb, spiral
+
+  - name: towns_ma
+    source: census://cousub/MA
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/MA
+          by_county: true
+          min_size: 3
+          emit_as: water_ma
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#FCE4EC"  # Light pink for MA
+      order: "50"
+    vary_fill: true
+    # patterns: meander, truchet, hilbert, lines, wiggle, brick
+
+  # County boundaries for each state
+  - name: counties_vt
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ny
+    source: census://county/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_nh
+    source: census://county/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ma
+    source: census://county/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  # Quebec municipalities (Canadian data)
+  # Note: No water subtraction - algorithm can't handle 533 municipalities at once
+  # Water is overlaid on top via NHN layers
+  - name: quebec_muni
+    source: quebec://municipalities
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#E8EAF6"  # Light indigo for Quebec
+      order: "50"
+    vary_fill: true
+    # patterns: gosper, stripe, peano, crosshatch, concentric, zigzag
+
+  # NHN water for Lake Champlain Quebec portion (Missisquoi Bay area)
+  # Rendered on top of Quebec municipalities (order < 50 = renders later = on top)
+  - name: water_quebec_champlain
+    source: canada://nhn/02OHB00
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#B3E5FC"
+      order: "15"
+    # pattern: concentric
+
+  # NHN water for Richelieu River corridor
+  - name: water_richelieu
+    source: canada://nhn/02OJ000
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#B3E5FC"
+      order: "15"
+    # pattern: concentric
+
+  # NHN water for Lake Memphremagog area (St-François River basin)
+  - name: water_memphremagog
+    source: canada://nhn/02OE000
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.15"
+      fill: "#B3E5FC"
+      order: "15"
+    # pattern: concentric
+
+  # State/Province boundaries (rendered on top)
+  - name: state_vt
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ny
+    source: census://state/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_nh
+    source: census://state/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ma
+    source: census://state/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
