@@ -1,6 +1,6 @@
 # Vermont Plotter Map - Rat King Edition
 # Version with 5-star rated patterns from rat-king for pen plotter
-# Each region has 6 patterns (one per shade 0-5), embedded as data-pattern attributes
+# Each region has 6 patterns with spacing/angle variations
 #
 # 5-star patterns: lines, crosshatch, zigzag, wiggle, spiral, concentric,
 #                  honeycomb, brick, truchet, stripe, gosper, hilbert, peano, meander
@@ -32,12 +32,24 @@ layers:
   - name: towns_vt
     source: census://cousub/VT
     patterns:
-      - concentric   # shade 0
-      - zigzag       # shade 1
-      - honeycomb    # shade 2
-      - meander      # shade 3
-      - spiral       # shade 4
-      - truchet      # shade 5
+      - pattern: concentric
+        spacing: 10
+        angle: 0
+      - pattern: zigzag
+        spacing: 8
+        angle: 45
+      - pattern: honeycomb
+        spacing: 12
+        angle: 30
+      - pattern: meander
+        spacing: 10
+        angle: 60
+      - pattern: spiral
+        spacing: 8
+        angle: 0
+      - pattern: truchet
+        spacing: 12
+        angle: 90
     operations:
       - type: subtract
         params:
@@ -60,12 +72,24 @@ layers:
   - name: towns_ny
     source: census://cousub/NY
     patterns:
-      - lines        # shade 0
-      - brick        # shade 1
-      - wiggle       # shade 2
-      - hilbert      # shade 3
-      - crosshatch   # shade 4
-      - gosper       # shade 5
+      - pattern: lines
+        spacing: 8
+        angle: 45
+      - pattern: brick
+        spacing: 10
+        angle: 0
+      - pattern: wiggle
+        spacing: 12
+        angle: 30
+      - pattern: hilbert
+        spacing: 8
+        angle: 90
+      - pattern: crosshatch
+        spacing: 10
+        angle: 45
+      - pattern: gosper
+        spacing: 12
+        angle: 60
     operations:
       - type: subtract
         params:
@@ -88,12 +112,24 @@ layers:
   - name: towns_nh
     source: census://cousub/NH
     patterns:
-      - peano        # shade 0
-      - concentric   # shade 1
-      - stripe       # shade 2
-      - zigzag       # shade 3
-      - honeycomb    # shade 4
-      - spiral       # shade 5
+      - pattern: peano
+        spacing: 10
+        angle: 0
+      - pattern: concentric
+        spacing: 12
+        angle: 0
+      - pattern: stripe
+        spacing: 8
+        angle: 60
+      - pattern: zigzag
+        spacing: 10
+        angle: 30
+      - pattern: honeycomb
+        spacing: 8
+        angle: 45
+      - pattern: spiral
+        spacing: 12
+        angle: 90
     operations:
       - type: subtract
         params:
@@ -116,12 +152,24 @@ layers:
   - name: towns_ma
     source: census://cousub/MA
     patterns:
-      - meander      # shade 0
-      - truchet      # shade 1
-      - hilbert      # shade 2
-      - lines        # shade 3
-      - wiggle       # shade 4
-      - brick        # shade 5
+      - pattern: meander
+        spacing: 12
+        angle: 45
+      - pattern: truchet
+        spacing: 8
+        angle: 0
+      - pattern: hilbert
+        spacing: 10
+        angle: 90
+      - pattern: lines
+        spacing: 12
+        angle: 30
+      - pattern: wiggle
+        spacing: 8
+        angle: 60
+      - pattern: brick
+        spacing: 10
+        angle: 45
     operations:
       - type: subtract
         params:
@@ -186,12 +234,24 @@ layers:
   - name: quebec_muni
     source: quebec://municipalities
     patterns:
-      - gosper       # shade 0
-      - stripe       # shade 1
-      - peano        # shade 2
-      - crosshatch   # shade 3
-      - concentric   # shade 4
-      - zigzag       # shade 5
+      - pattern: gosper
+        spacing: 8
+        angle: 30
+      - pattern: stripe
+        spacing: 10
+        angle: 0
+      - pattern: peano
+        spacing: 12
+        angle: 60
+      - pattern: crosshatch
+        spacing: 8
+        angle: 45
+      - pattern: concentric
+        spacing: 10
+        angle: 0
+      - pattern: zigzag
+        spacing: 12
+        angle: 90
     operations:
       - type: clip
     style:
@@ -204,7 +264,8 @@ layers:
   - name: water_quebec_champlain
     source: canada://nhn/02OHB00
     patterns:
-      - concentric
+      - pattern: concentric
+        spacing: 10
     operations:
       - type: filter_by_size
         params:
@@ -220,7 +281,8 @@ layers:
   - name: water_richelieu
     source: canada://nhn/02OJ000
     patterns:
-      - concentric
+      - pattern: concentric
+        spacing: 10
     operations:
       - type: filter_by_size
         params:
@@ -236,7 +298,8 @@ layers:
   - name: water_memphremagog
     source: canada://nhn/02OE000
     patterns:
-      - concentric
+      - pattern: concentric
+        spacing: 10
     operations:
       - type: filter_by_size
         params:

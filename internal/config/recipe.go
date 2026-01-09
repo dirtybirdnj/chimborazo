@@ -1,5 +1,7 @@
 package config
 
+import "gopkg.in/yaml.v3"
+
 // Recipe defines a complete map build
 type Recipe struct {
 	Name     string                `yaml:"name"`
@@ -83,10 +85,37 @@ type Layer struct {
 	FillBy        string            `yaml:"fill_by,omitempty"`       // Property to color by
 	ColorMap      map[string]string `yaml:"color_map,omitempty"`     // Property value → color
 	VaryFill      bool              `yaml:"vary_fill,omitempty"`     // Slight color variations
-	Patterns      []string          `yaml:"patterns,omitempty"`      // Pattern names to cycle through (for rat-king)
+	Patterns      []PatternConfig   `yaml:"patterns,omitempty"`      // Pattern configs to cycle through (for rat-king)
 	Filter        string            `yaml:"filter,omitempty"`
 	Labels        bool              `yaml:"labels,omitempty"`        // Show labels for features
 	LabelProperty string            `yaml:"label_property,omitempty"` // Property to use for labels (default: "NAME")
+}
+
+// PatternConfig defines a fill pattern with optional spacing and angle.
+// Can be unmarshaled from either a string ("concentric") or an object
+// ({pattern: "concentric", spacing: 10, angle: 45}).
+type PatternConfig struct {
+	Pattern string  `yaml:"pattern"`
+	Spacing float64 `yaml:"spacing,omitempty"` // Line spacing in pixels (0 = use default)
+	Angle   float64 `yaml:"angle,omitempty"`   // Pattern angle in degrees (0 = use default)
+}
+
+// UnmarshalYAML implements custom unmarshaling to support both string and object forms.
+func (p *PatternConfig) UnmarshalYAML(node *yaml.Node) error {
+	// Try string first
+	if node.Kind == yaml.ScalarNode {
+		p.Pattern = node.Value
+		return nil
+	}
+
+	// Otherwise decode as struct
+	type patternAlias PatternConfig
+	var alias patternAlias
+	if err := node.Decode(&alias); err != nil {
+		return err
+	}
+	*p = PatternConfig(alias)
+	return nil
 }
 
 // Operation defines a geometry operation

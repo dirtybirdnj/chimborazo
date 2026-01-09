@@ -41,9 +41,16 @@ type Layer struct {
 	FillBy        string            // Property name to color by
 	ColorMap      map[string]string // Property value → fill color
 	VaryFill      bool              // Apply slight color variations
-	Patterns      []string          // Pattern names to cycle through (for rat-king data attributes)
+	Patterns      []PatternConfig   // Pattern configs to cycle through (for rat-king data attributes)
 	ShowLabels    bool              // Show labels for features
 	LabelProperty string            // Property to use for labels (e.g., "NAME")
+}
+
+// PatternConfig defines a fill pattern with optional spacing and angle.
+type PatternConfig struct {
+	Pattern string  // Pattern name (e.g., "concentric", "zigzag")
+	Spacing float64 // Line spacing in pixels (0 = use default)
+	Angle   float64 // Pattern angle in degrees (0 = use default)
 }
 
 // DefaultStyle returns a reasonable default style.
@@ -273,7 +280,7 @@ func (w *SVGWriter) WriteCollectionWithColors(fc geometry.FeatureCollection, sty
 }
 
 // WriteCollectionWithColorsAndPatterns converts a FeatureCollection with per-feature coloring and pattern attributes.
-func (w *SVGWriter) WriteCollectionWithColorsAndPatterns(fc geometry.FeatureCollection, style Style, fillBy string, colorMap map[string]string, varyFill bool, patterns []string) string {
+func (w *SVGWriter) WriteCollectionWithColorsAndPatterns(fc geometry.FeatureCollection, style Style, fillBy string, colorMap map[string]string, varyFill bool, patterns []PatternConfig) string {
 	var sb strings.Builder
 	for i, f := range fc {
 		// Determine fill color for this feature
@@ -305,10 +312,17 @@ func (w *SVGWriter) WriteCollectionWithColorsAndPatterns(fc geometry.FeatureColl
 		// Build data attributes for rat-king
 		var dataAttrs map[string]string
 		if len(patterns) > 0 {
-			pattern := patterns[i%len(patterns)]
+			patternCfg := patterns[i%len(patterns)]
 			dataAttrs = map[string]string{
-				"pattern": pattern,
+				"pattern": patternCfg.Pattern,
 				"shade":   fmt.Sprintf("%d", shade),
+			}
+			// Only include spacing/angle if non-zero (lets rat-king use defaults)
+			if patternCfg.Spacing > 0 {
+				dataAttrs["spacing"] = fmt.Sprintf("%.1f", patternCfg.Spacing)
+			}
+			if patternCfg.Angle != 0 {
+				dataAttrs["angle"] = fmt.Sprintf("%.1f", patternCfg.Angle)
 			}
 		}
 

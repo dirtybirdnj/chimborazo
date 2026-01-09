@@ -420,6 +420,16 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 		labelProp = "NAME"
 	}
 
+	// Convert pattern configs from config to output type
+	var patterns []output.PatternConfig
+	for _, p := range layerDef.Patterns {
+		patterns = append(patterns, output.PatternConfig{
+			Pattern: p.Pattern,
+			Spacing: p.Spacing,
+			Angle:   p.Angle,
+		})
+	}
+
 	return &output.Layer{
 		Name:          layerDef.Name,
 		Features:      features,
@@ -428,7 +438,7 @@ func (b *Builder) processLayer(layerDef config.Layer, bounds orb.Bound) (*output
 		FillBy:        layerDef.FillBy,
 		ColorMap:      layerDef.ColorMap,
 		VaryFill:      layerDef.VaryFill,
-		Patterns:      layerDef.Patterns,
+		Patterns:      patterns,
 		ShowLabels:    layerDef.Labels,
 		LabelProperty: labelProp,
 	}, nil
