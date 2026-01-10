@@ -15,6 +15,8 @@ import (
 var CanVecURLs = map[string]string{
 	// CanVec 1:1,000,000 scale - national hydro coverage (~150 MB)
 	"hydro": "https://ftp.maps.canada.ca/pub/nrcan_rncan/vector/canvec/shp/Hydro/canvec_1M_CA_Hydro_shp.zip",
+	// CanVec 1:1,000,000 scale - national transport coverage (~6.5 MB)
+	"transport": "https://ftp.maps.canada.ca/pub/nrcan_rncan/vector/canvec/shp/Transport/canvec_1M_CA_Transport_shp.zip",
 }
 
 // NHNWorkunits maps workunit codes to their descriptions.
@@ -42,6 +44,8 @@ type CanadaURI struct {
 // ParseCanadaURI parses a canada URI.
 // Supported formats:
 //   - canada://canvec/hydro
+//   - canada://canvec/roads (national roads from transport dataset)
+//   - canada://canvec/rails (national railways from transport dataset)
 //   - canada://nhn/02OJ000 (area water)
 //   - canada://nhn/02OJ000/rivers (linear water)
 func ParseCanadaURI(uri string) (*CanadaURI, error) {
@@ -72,15 +76,22 @@ func ParseCanadaURI(uri string) (*CanadaURI, error) {
 	case "canvec":
 		// CanVec data
 		dataType = strings.ToLower(dataType)
-		url, ok := CanVecURLs[dataType]
+
+		// Map roads/rails to transport dataset
+		dataset := dataType
+		if dataType == "roads" || dataType == "rails" {
+			dataset = "transport"
+		}
+
+		url, ok := CanVecURLs[dataset]
 		if !ok {
-			return nil, fmt.Errorf("unknown canvec type: %s (valid: hydro)", dataType)
+			return nil, fmt.Errorf("unknown canvec type: %s (valid: hydro, roads, rails)", dataType)
 		}
 		return &CanadaURI{
 			Source:   "canvec",
-			Type:     dataType,
+			Type:     dataType, // Keep original type (roads, rails) for shapefile selection
 			URL:      url,
-			CacheDir: fmt.Sprintf("canada/canvec/%s", dataType),
+			CacheDir: fmt.Sprintf("canada/canvec/%s", dataset),
 		}, nil
 
 	case "nhn":
@@ -124,6 +135,9 @@ func (c *CanadaURI) CacheKey() string {
 // CanVec hydro contains:
 //   - waterbody_2.shp - Area water
 //   - water_linear_flow_1.shp - Linear water (rivers)
+// CanVec transport contains:
+//   - road_segment_1.shp - Roads (line features)
+//   - track_segment_1.shp - Railways (line features)
 func (c *CanadaURI) ShapefilePattern() string {
 	if c.Source == "nhn" {
 		if c.SubType == "rivers" {
@@ -131,9 +145,18 @@ func (c *CanadaURI) ShapefilePattern() string {
 		}
 		return "*WATERBODY*.shp" // Area water (uppercase in NHN)
 	}
-	// CanVec hydro - use waterbody for polygons
-	if c.SubType == "rivers" {
-		return "*water_linear_flow*.shp"
+	// CanVec - select appropriate shapefile based on type
+	switch c.Type {
+	case "roads":
+		return "*road_segment*.shp"
+	case "rails":
+		return "*track_segment*.shp"
+	case "hydro":
+		if c.SubType == "rivers" {
+			return "*water_linear_flow*.shp"
+		}
+		return "*waterbody*.shp"
+	default:
+		return "*waterbody*.shp"
 	}
-	return "*waterbody*.shp"
 }

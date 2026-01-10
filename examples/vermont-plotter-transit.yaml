@@ -1,17 +1,17 @@
-# Vermont Plotter Map - Rat King Edition
-# Version with 5-star rated patterns from rat-king for pen plotter
-# Each region has 6 patterns with spacing/angle variations
+# Vermont Plotter Map - Transit Edition
+# Version with towns, water, highways (and railroads when available)
+# Each region has 6 patterns with spacing/angle variations for rat-king
 #
 # 5-star patterns: lines, crosshatch, zigzag, wiggle, spiral, concentric,
 #                  honeycomb, brick, truchet, stripe, gosper, hilbert, peano, meander
 #
-# Run with: chimborazo build examples/vermont-plotter-ratking.yaml
-# Then:     rat-king fill output/vermont-plotter-ratking.svg -o output/vermont-plotter-ratking-filled.svg
+# Run with: chimborazo build examples/vermont-plotter-transit.yaml
+# Then:     rat-king fill output/vermont-plotter-transit.svg -o output/vermont-plotter-transit-filled.svg
 
-name: Vermont Plotter Ratking
+name: Vermont Plotter Transit
 
 output:
-  path: output/vermont-plotter-ratking.svg
+  path: output/vermont-plotter-transit.svg
   width: 12
   height: 18
   units: inches
@@ -310,4 +310,67 @@ layers:
       stroke_width: "0.15"
       fill: "none"
       order: "15"
+
+  # Primary/Secondary Roads (Highways) - rendered on top
+  - name: highways_vt
+    source: census://prisecroads/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  - name: highways_ny
+    source: census://prisecroads/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  - name: highways_nh
+    source: census://prisecroads/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  - name: highways_ma
+    source: census://prisecroads/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  # Canadian roads from CanVec 1:1M (covers all of Canada)
+  - name: roads_canada
+    source: canada://canvec/roads
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  # Railways from CanVec 1:1M (covers all of Canada including Quebec)
+  - name: rails_canada
+    source: canada://canvec/rails
+    operations:
+      - type: clip
+    style:
+      stroke: "#8B4513"
+      stroke_width: "0.2"
+      fill: "none"
+      order: "85"
 
