@@ -43,6 +43,16 @@ type BuildResult struct {
 	Bounds       orb.Bound
 	Errors       []error
 	Warnings     []string
+	Stats        SVGStats // SVG element statistics
+}
+
+// SVGStats tracks counts of SVG elements in the output.
+type SVGStats struct {
+	Paths      int   // Number of <path> elements
+	Groups     int   // Number of <g> elements
+	FilledPath int   // Paths with fill != "none"
+	StrokedPath int  // Paths with stroke != "none"
+	FileSize   int64 // File size in bytes
 }
 
 // AnalysisResult contains findings from post-build analysis.
@@ -198,8 +208,39 @@ func (b *Builder) Build() (*BuildResult, error) {
 		b.logf("Wrote: %s", outPath)
 	}
 
+	// Step 7: Collect SVG stats
+	result.Stats = b.collectSVGStats(result.OutputPath)
+
 	result.Duration = time.Since(start)
 	return result, nil
+}
+
+// collectSVGStats reads an SVG file and counts elements.
+func (b *Builder) collectSVGStats(path string) SVGStats {
+	stats := SVGStats{}
+
+	// Get file size
+	info, err := os.Stat(path)
+	if err == nil {
+		stats.FileSize = info.Size()
+	}
+
+	// Read file and count elements
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return stats
+	}
+
+	content := string(data)
+	stats.Paths = strings.Count(content, "<path ")
+	stats.Groups = strings.Count(content, "<g ")
+
+	// Count filled vs stroked paths (rough estimate)
+	// This is approximate - counts occurrences in path elements
+	stats.FilledPath = strings.Count(content, `fill="#`) + strings.Count(content, `fill="rgb`)
+	stats.StrokedPath = strings.Count(content, `stroke="#`) + strings.Count(content, `stroke="rgb`)
+
+	return stats
 }
 
 // BuildWithAnalysis builds the map and performs validation analysis.

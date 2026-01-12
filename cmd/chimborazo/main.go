@@ -50,6 +50,8 @@ func getCacheDir() string {
 
 func buildCmd() *cobra.Command {
 	var verbose bool
+	var optimize bool
+	var showStats bool
 
 	cmd := &cobra.Command{
 		Use:   "build [recipe.yaml]",
@@ -88,12 +90,58 @@ func buildCmd() *cobra.Command {
 
 			fmt.Printf("✓ Built %s (%d layers, %d features) in %v\n",
 				result.OutputPath, result.LayerCount, result.FeatureCount, result.Duration)
+
+			// Show stats if requested or always in verbose mode
+			if showStats || verbose {
+				fmt.Printf("  SVG stats: %d paths, %d groups, %.1f MB\n",
+					result.Stats.Paths, result.Stats.Groups,
+					float64(result.Stats.FileSize)/(1024*1024))
+			}
+
+			// Run svgo optimization if requested
+			if optimize {
+				if err := runSVGO(result.OutputPath); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: svgo optimization failed: %v\n", err)
+				}
+			}
 		},
 	}
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed progress")
+	cmd.Flags().BoolVarP(&optimize, "optimize", "O", false, "Optimize SVG with svgo (requires svgo installed)")
+	cmd.Flags().BoolVarP(&showStats, "stats", "s", false, "Show SVG element statistics")
 
 	return cmd
+}
+
+// runSVGO runs svgo to optimize the SVG file in place.
+func runSVGO(path string) error {
+	// Check if svgo is available
+	if _, err := exec.LookPath("svgo"); err != nil {
+		return fmt.Errorf("svgo not found in PATH (install with: npm install -g svgo)")
+	}
+
+	// Get original size
+	origInfo, _ := os.Stat(path)
+	origSize := origInfo.Size()
+
+	// Run svgo
+	cmd := exec.Command("svgo", path, "-o", path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("svgo failed: %w\n%s", err, output)
+	}
+
+	// Get new size
+	newInfo, _ := os.Stat(path)
+	newSize := newInfo.Size()
+
+	// Report savings
+	savings := float64(origSize-newSize) / float64(origSize) * 100
+	fmt.Printf("✓ Optimized with svgo: %.1f MB → %.1f MB (%.1f%% reduction)\n",
+		float64(origSize)/(1024*1024), float64(newSize)/(1024*1024), savings)
+
+	return nil
 }
 
 func validateCmd() *cobra.Command {
