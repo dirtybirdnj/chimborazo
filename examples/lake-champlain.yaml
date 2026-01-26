@@ -1,0 +1,39 @@
+# Lake Champlain Region Map
+# Uses explicit bounds to focus on Lake Champlain area
+#
+# Run with: chimborazo build examples/lake-champlain.yaml
+
+name: Lake Champlain Region
+
+output:
+  path: output/lake-champlain.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+
+# Explicit bounds: [West, South, East, North]
+bounds:
+  explicit: [-73.5, 44.0, -73.0, 45.0]
+  padding: 0.02
+
+layers:
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "100"
+
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "1.0"
+      fill: "none"
+      order: "50"

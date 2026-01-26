@@ -1,0 +1,54 @@
+# Vermont with Default Styles
+# Demonstrates style inheritance from defaults section
+#
+# Run with: chimborazo build examples/vermont-defaults.yaml
+
+name: Vermont with Inherited Styles
+
+output:
+  path: output/vermont-defaults.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+# Default styles inherited by all layers
+defaults:
+  style:
+    stroke: "#333333"
+    stroke_width: "1.0"
+    fill: "none"
+    opacity: "1.0"
+
+layers:
+  # State boundary - overrides stroke_width only
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke_width: "2.5"  # Override default
+      order: "100"
+
+  # Counties - overrides stroke color only
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"  # Override default
+      order: "50"
+
+  # Towns - uses all defaults (no style overrides)
+  - name: towns
+    source: file://~/Library/Caches/strata/census/tiger/2023/vt/cousub/tl_2023_50_cousub.shp
+    operations:
+      - type: clip
+    style:
+      stroke: "#AAAAAA"
+      stroke_width: "0.3"
+      order: "25"

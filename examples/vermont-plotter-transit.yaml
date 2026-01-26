@@ -1,0 +1,376 @@
+# Vermont Plotter Map - Transit Edition
+# Version with towns, water, highways (and railroads when available)
+# Each region has 6 patterns with spacing/angle variations for rat-king
+#
+# 5-star patterns: lines, crosshatch, zigzag, wiggle, spiral, concentric,
+#                  honeycomb, brick, truchet, stripe, gosper, hilbert, peano, meander
+#
+# Run with: chimborazo build examples/vermont-plotter-transit.yaml
+# Then:     rat-king fill output/vermont-plotter-transit.svg -o output/vermont-plotter-transit-filled.svg
+
+name: Vermont Plotter Transit
+
+output:
+  path: output/vermont-plotter-transit.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: plotter
+  min_feature_size: 0
+  rulers: true
+
+bounds:
+  # Centered on Vermont
+  # [West, South, East, North]
+  explicit: [-73.65, 42.45, -71.45, 45.45]
+  padding: 0.02
+
+layers:
+  # Towns/cousubs for each state - emit water layers via subtract operation
+  # This ensures water display matches cutouts exactly (no offset issues)
+
+  - name: towns_vt
+    source: census://cousub/VT
+    patterns:
+      - pattern: concentric
+        spacing: 10
+        angle: 0
+      - pattern: zigzag
+        spacing: 8
+        angle: 45
+      - pattern: honeycomb
+        spacing: 12
+        angle: 30
+      - pattern: meander
+        spacing: 10
+        angle: 60
+      - pattern: spiral
+        spacing: 8
+        angle: 0
+      - pattern: truchet
+        spacing: 12
+        angle: 90
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3
+          emit_as: water_vt
+          emit_style:
+            stroke: "#0288D1"
+            stroke_width: "0.15"
+            fill: "none"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#2E7D32"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "50"
+
+  - name: towns_ny
+    source: census://cousub/NY
+    patterns:
+      - pattern: lines
+        spacing: 8
+        angle: 45
+      - pattern: brick
+        spacing: 10
+        angle: 0
+      - pattern: wiggle
+        spacing: 12
+        angle: 30
+      - pattern: hilbert
+        spacing: 8
+        angle: 90
+      - pattern: crosshatch
+        spacing: 10
+        angle: 45
+      - pattern: gosper
+        spacing: 12
+        angle: 60
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NY
+          by_county: true
+          min_size: 3
+          emit_as: water_ny
+          emit_style:
+            stroke: "#0288D1"
+            stroke_width: "0.15"
+            fill: "none"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#E65100"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "50"
+
+  - name: towns_nh
+    source: census://cousub/NH
+    patterns:
+      - pattern: peano
+        spacing: 10
+        angle: 0
+      - pattern: concentric
+        spacing: 12
+        angle: 0
+      - pattern: stripe
+        spacing: 8
+        angle: 60
+      - pattern: zigzag
+        spacing: 10
+        angle: 30
+      - pattern: honeycomb
+        spacing: 8
+        angle: 45
+      - pattern: spiral
+        spacing: 12
+        angle: 90
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NH
+          by_county: true
+          min_size: 3
+          emit_as: water_nh
+          emit_style:
+            stroke: "#0288D1"
+            stroke_width: "0.15"
+            fill: "none"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#1565C0"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "50"
+
+  - name: towns_ma
+    source: census://cousub/MA
+    patterns:
+      - pattern: meander
+        spacing: 12
+        angle: 45
+      - pattern: truchet
+        spacing: 8
+        angle: 0
+      - pattern: hilbert
+        spacing: 10
+        angle: 90
+      - pattern: lines
+        spacing: 12
+        angle: 30
+      - pattern: wiggle
+        spacing: 8
+        angle: 60
+      - pattern: brick
+        spacing: 10
+        angle: 45
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/MA
+          by_county: true
+          min_size: 3
+          emit_as: water_ma
+          emit_style:
+            stroke: "#0288D1"
+            stroke_width: "0.15"
+            fill: "none"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#AD1457"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "50"
+
+  # County boundaries for each state (no patterns - just outlines)
+  - name: counties_vt
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ny
+    source: census://county/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_nh
+    source: census://county/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ma
+    source: census://county/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "80"
+
+  # Quebec municipalities (Canadian data)
+  - name: quebec_muni
+    source: quebec://municipalities
+    patterns:
+      - pattern: gosper
+        spacing: 8
+        angle: 30
+      - pattern: stripe
+        spacing: 10
+        angle: 0
+      - pattern: peano
+        spacing: 12
+        angle: 60
+      - pattern: crosshatch
+        spacing: 8
+        angle: 45
+      - pattern: concentric
+        spacing: 10
+        angle: 0
+      - pattern: zigzag
+        spacing: 12
+        angle: 90
+    operations:
+      - type: clip
+    style:
+      stroke: "#3949AB"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "50"
+
+  # NHN water for Lake Champlain Quebec portion (all use concentric)
+  - name: water_quebec_champlain
+    source: canada://nhn/02OHB00
+    patterns:
+      - pattern: concentric
+        spacing: 10
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#0288D1"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "15"
+
+  # NHN water for Richelieu River corridor
+  - name: water_richelieu
+    source: canada://nhn/02OJ000
+    patterns:
+      - pattern: concentric
+        spacing: 10
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#0288D1"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "15"
+
+  # NHN water for Lake Memphremagog area
+  - name: water_memphremagog
+    source: canada://nhn/02OE000
+    patterns:
+      - pattern: concentric
+        spacing: 10
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#0288D1"
+      stroke_width: "0.15"
+      fill: "none"
+      order: "15"
+
+  # Primary/Secondary Roads (Highways) - rendered on top
+  - name: highways_vt
+    source: census://prisecroads/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  - name: highways_ny
+    source: census://prisecroads/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  - name: highways_nh
+    source: census://prisecroads/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  - name: highways_ma
+    source: census://prisecroads/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  # Canadian roads from CanVec 1:1M (covers all of Canada)
+  - name: roads_canada
+    source: canada://canvec/roads
+    operations:
+      - type: clip
+    style:
+      stroke: "#000000"
+      stroke_width: "0.25"
+      fill: "none"
+      order: "90"
+
+  # Railways from CanVec 1:1M (covers all of Canada including Quebec)
+  - name: rails_canada
+    source: canada://canvec/rails
+    operations:
+      - type: clip
+    style:
+      stroke: "#8B4513"
+      stroke_width: "0.2"
+      fill: "none"
+      order: "85"
+

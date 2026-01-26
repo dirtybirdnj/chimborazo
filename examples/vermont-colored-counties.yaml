@@ -1,0 +1,57 @@
+# Vermont Colored Counties
+# Demonstrates fill_by + color_map for per-county coloring
+#
+# Run with: chimborazo build -v examples/vermont-colored-counties.yaml
+
+name: Vermont Colored Counties
+
+output:
+  path: output/vermont-colored.svg
+  width: 12
+  height: 18
+  units: inches
+  quality: high
+
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+layers:
+  # State boundary (rendered on top)
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "100"
+
+  # Counties with per-county coloring
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+    fill_by: NAME
+    color_map:
+      Addison: "#E8F5E9"
+      Bennington: "#FFF3E0"
+      Caledonia: "#E3F2FD"
+      Chittenden: "#FCE4EC"
+      Essex: "#F3E5F5"
+      Franklin: "#E0F7FA"
+      Grand Isle: "#FFF8E1"
+      Lamoille: "#E8EAF6"
+      Orange: "#FFEBEE"
+      Orleans: "#E1F5FE"
+      Rutland: "#F1F8E9"
+      Washington: "#FBE9E7"
+      Windham: "#E0F2F1"
+      Windsor: "#EDE7F6"
+    vary_fill: true
+    style:
+      stroke: "#666666"
+      stroke_width: "1.0"
+      fill: "#EEEEEE"  # Default for unmapped
+      order: "50"

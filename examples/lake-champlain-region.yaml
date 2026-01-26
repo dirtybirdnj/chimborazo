@@ -1,0 +1,258 @@
+# Lake Champlain Region - Multi-State/Province Map
+# Includes: Vermont, New York, New Hampshire, Massachusetts, Quebec
+#
+# Uses emit_as for unified water layers - ensures water display matches cutouts exactly
+#
+# Run with: chimborazo build examples/lake-champlain-region.yaml
+
+name: Lake Champlain Region with Quebec
+
+output:
+  path: output/lake-champlain-region.svg
+  width: 18
+  height: 24
+  units: inches
+  quality: high
+  min_feature_size: 0
+  rulers: true
+
+bounds:
+  # Centered on Lake Champlain
+  # Lake extends from ~43.0°N (Crown Point) to ~45.1°N (Missisquoi Bay)
+  # [West, South, East, North]
+  explicit: [-74.0, 43.0, -71.8, 45.5]
+  padding: 0.02
+
+layers:
+  # Towns/cousubs for each state - emit water layers via subtract operation
+  # This ensures water display matches cutouts exactly (no offset issues)
+
+  - name: towns_vt
+    source: census://cousub/VT
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/VT
+          by_county: true
+          min_size: 3
+          emit_as: water_vt
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E8F5E9"  # Light green for VT
+      order: "50"
+
+  - name: towns_ny
+    source: census://cousub/NY
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NY
+          by_county: true
+          min_size: 3
+          emit_as: water_ny
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#FFF3E0"  # Light orange for NY
+      order: "50"
+
+  - name: towns_nh
+    source: census://cousub/NH
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/NH
+          by_county: true
+          min_size: 3
+          emit_as: water_nh
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E3F2FD"  # Light blue for NH
+      order: "50"
+
+  - name: towns_ma
+    source: census://cousub/MA
+    operations:
+      - type: subtract
+        params:
+          source: census://areawater/MA
+          by_county: true
+          min_size: 3
+          emit_as: water_ma
+          emit_style:
+            stroke: "none"
+            fill: "#B3E5FC"
+          emit_order: 10
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#FCE4EC"  # Light pink for MA
+      order: "50"
+
+  # County boundaries for each state
+  - name: counties_vt
+    source: census://county/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ny
+    source: census://county/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  - name: counties_nh
+    source: census://county/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  - name: counties_ma
+    source: census://county/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#444444"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "80"
+
+  # Quebec municipalities (Canadian data)
+  # Note: No water subtraction - algorithm can't handle 533 municipalities at once
+  # Water is overlaid on top via NHN layers
+  - name: quebec_muni
+    source: quebec://municipalities
+    operations:
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#E8EAF6"  # Light indigo for Quebec
+      order: "50"
+
+  # NHN water for Lake Champlain Quebec portion (Missisquoi Bay area)
+  # Rendered on top of Quebec municipalities (order < 50 = renders later = on top)
+  # Stroke matches VT town boundaries (0.3) for consistent water edge appearance
+  - name: water_quebec_champlain
+    source: canada://nhn/02OHB00
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#B3E5FC"
+      order: "15"
+
+  # NHN water for Richelieu River corridor
+  - name: water_richelieu
+    source: canada://nhn/02OJ000
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#B3E5FC"
+      order: "15"
+
+  # NHN water for Lake Memphremagog area (St-François River basin)
+  - name: water_memphremagog
+    source: canada://nhn/02OE000
+    operations:
+      - type: filter_by_size
+        params:
+          min_size: 3
+      - type: clip
+    style:
+      stroke: "#666666"
+      stroke_width: "0.3"
+      fill: "#B3E5FC"
+      order: "15"
+
+  # Quebec MRC (Regional County Municipality) boundaries
+  - name: quebec_mrc
+    source: quebec://mrc
+    operations:
+      - type: clip
+    style:
+      stroke: "#5C6BC0"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "75"
+
+  # State/Province boundaries (rendered on top)
+  - name: state_vt
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ny
+    source: census://state/NY
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_nh
+    source: census://state/NH
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"
+
+  - name: state_ma
+    source: census://state/MA
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "0.8"
+      fill: "none"
+      order: "90"

@@ -1,0 +1,46 @@
+# Vermont State Map
+# A simple recipe to test the Chimborazo pipeline
+#
+# This recipe renders Vermont's state boundary and counties.
+# Run with: chimborazo build examples/vermont.yaml
+
+name: Vermont State Map
+
+# Output configuration
+output:
+  path: output/vermont.svg
+  width: 12
+  height: 18
+  units: inches
+
+# Map bounds derived from state geometry
+bounds:
+  source: census://state/VT
+  padding: 0.05
+
+# Map layers (rendered in order, first = bottom)
+layers:
+  # State boundary - thick outline
+  - name: state_boundary
+    source: census://state/VT
+    operations:
+      - type: clip
+    style:
+      stroke: "#333333"
+      stroke_width: "2.0"
+      fill: "none"
+      order: "100"
+
+  # County boundaries - thin gray lines
+  - name: counties
+    source: census://county/VT
+    operations:
+      - type: clip
+      - type: simplify
+        params:
+          tolerance: 0.0001
+    style:
+      stroke: "#999999"
+      stroke_width: "0.5"
+      fill: "none"
+      order: "50"
